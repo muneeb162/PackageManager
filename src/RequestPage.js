@@ -1,144 +1,170 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/Card";
-
+import { BarChart, Inbox, Calendar, Users, Settings, Sun, Moon } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useTheme } from './ThemeContext';
 
 const RequestPage = () => {
-  const [requestType, setRequestType] = useState('');
-  const [selectedSubType, setSelectedSubType] = useState('');
-  const [selectedInstallerType, setSelectedInstallerType] = useState('');
-  const [formData, setFormData] = useState({});
+    const navigate = useNavigate();
+    const { isDarkMode, toggleTheme } = useTheme();
+    const [selectedProject, setSelectedProject] = useState('');
+    const [requestType, setRequestType] = useState('');
+    const [selectedTypes, setSelectedTypes] = useState([]);
+    const [formData, setFormData] = useState({});
 
-  // Define field configurations for different patch types
+  // Previous configurations remain the same...
+  const projectConfigs = {
+    'IRIS': ['installer', 'patch', 'upgrader'],
+    'Sparrow': ['installer', 'patch', 'upgrader']
+  };
+
   const patchFields = {
     'Product Patch': [
-      { name: 'tag', label: 'Tag', required: true },
-      { name: 'version', label: 'Version', required: true },
-      { name: 'previousVersion', label: 'Previous Version', required: true },
-      { name: 'branch', label: 'Branch', required: true },
-      { name: 'masterPRNumber', label: 'Master PR Number', required: true },
-      { name: 'repo', label: 'Repo', required: true }
+      { name: 'productTag', label: 'Product Tag', required: true },
+      { name: 'productVersion', label: 'Product Version', required: true },
+      { name: 'productPreviousVersion', label: 'Product Previous Version', required: true },
+      { name: 'productBranch', label: 'Product Branch', required: true },
+      { name: 'productMasterPRNumber', label: 'Product Master PR Number', required: true },
+      { name: 'productRepo', label: 'Product Repo', required: true }
     ],
-	'Product Custom Patch': [
-      { name: 'tag', label: 'Tag', required: true },
-      { name: 'version', label: 'Version', required: true },
-      { name: 'branch', label: 'Branch', required: true },
-      { name: 'masterPRNumber', label: 'Master PR Number', required: true },
-      { name: 'repo', label: 'Repo', required: true },
-      { name: 'customRepo', label: 'Custom Repo', required: true },
-      { name: 'customBranch', label: 'Custom Branch', required: true },
+    'Custom Patch': [
       { name: 'customTag', label: 'Custom Tag', required: true },
       { name: 'customVersion', label: 'Custom Version', required: true },
       { name: 'previousCustomVersion', label: 'Previous Custom Version', required: true },
+      { name: 'customBranch', label: 'Custom Branch', required: true },
+      { name: 'customRepo', label: 'Custom Repo', required: true },
       { name: 'bank', label: 'Bank', required: true }
     ],
-    'Product with Product Custom and Product Scheme Patch': [
-      { name: 'tag', label: 'Tag', required: true },
-      { name: 'version', label: 'Version', required: true },
-      { name: 'previousVersion', label: 'Previous Version', required: true },
-      { name: 'branch', label: 'Branch', required: true },
-      { name: 'masterPRNumber', label: 'Master PR Number', required: true },
-      { name: 'repo', label: 'Repo', required: true },
-      { name: 'customRepo', label: 'Custom Repo', required: true },
-      { name: 'customBranch', label: 'Custom Branch', required: true },
-      { name: 'customTag', label: 'Custom Tag', required: true },
-      { name: 'customVersion', label: 'Custom Version', required: true },
-      { name: 'previousCustomVersion', label: 'Previous Custom Version', required: true },
-      { name: 'bank', label: 'Bank', required: true },
-      { name: 'schemeRepo', label: 'Scheme Repo', required: true },
+    'Scheme Patch': [
       { name: 'schemeTag', label: 'Scheme Tag', required: true },
       { name: 'schemeVersion', label: 'Scheme Version', required: true },
+      { name: 'previousSchemeVersion', label: 'Previous Scheme Version', required: true },
       { name: 'schemeBranch', label: 'Scheme Branch', required: true },
-      { name: 'schemePreviousVersion', label: 'Scheme Previous Version', required: true }
+      { name: 'schemeRepo', label: 'Scheme Repo', required: true },
+      { name: 'bank', label: 'Bank', required: true }
     ],
-    'Product with Platform tag Patch': [
-      { name: 'tag', label: 'Tag', required: true },
-      { name: 'version', label: 'Version', required: true },
-      { name: 'previousVersion', label: 'Previous Version', required: true },
-      { name: 'branch', label: 'Branch', required: true },
-      { name: 'masterPRNumber', label: 'Master PR Number', required: true },
-      { name: 'repo', label: 'Repo', required: true },
-      { name: 'bank', label: 'Bank', required: true },
-      { name: 'platformRepo', label: 'Platform Repo', required: true },
-      { name: 'platformBranch', label: 'Platform Branch', required: true },
+    'Platform Patch': [
       { name: 'platformTag', label: 'Platform Tag', required: true },
-      { name: 'platformPreviousTag', label: 'Platform Previous Tag', required: true }
+      { name: 'platformVersion', label: 'Platform Version', required: true },
+      { name: 'previousplatformVersion', label: 'Previous Platform Version', required: true },
+      { name: 'platformBranch', label: 'Platform Branch', required: true },
+      { name: 'platformRepo', label: 'Platform Repo', required: true },
+      { name: 'bank', label: 'Bank', required: true }
     ],
-    'Product with Project tag Patch': [
-      { name: 'tag', label: 'Tag', required: true },
-      { name: 'version', label: 'Version', required: true },
-      { name: 'previousVersion', label: 'Previous Version', required: true },
-      { name: 'branch', label: 'Branch', required: true },
-      { name: 'masterPRNumber', label: 'Master PR Number', required: true },
-      { name: 'repo', label: 'Repo', required: true },
+    'Project Patch': [
+      { name: 'projectTag', label: 'Project Tag', required: true },
+      { name: 'projectVersion', label: 'Project Version', required: true },
+      { name: 'previousprojectVersion', label: 'Previous Project Version', required: true },
+      { name: 'projectBranch', label: 'Project Branch', required: true },
       { name: 'projectRepo', label: 'Project Repo', required: true },
-      { name: 'projectName', label: 'Project Name', required: true },
-      { name: 'projectBranchName', label: 'Project Branch Name', required: true },
-      { name: 'projectCurrentVersion', label: 'Project Current Version', required: true },
-      { name: 'projectPreviousVersion', label: 'Project Previous Version', required: true }
-    ]
-    // Additional patch types...
+      { name: 'projectCollection', label: 'Project Collection', required: true },
+      { name: 'bank', label: 'Bank', required: true }
+    ],
   };
 
   const installerFields = {
     'Product Installer': [
-      { name: 'tag', label: 'Tag', required: true },
-      { name: 'version', label: 'Version', required: true },
-      { name: 'branch', label: 'Branch', required: true },
-      { name: 'masterPRNumber', label: 'Master PR Number', required: true },
-      { name: 'repo', label: 'Repo', required: true }
-    ],
-	'Product Custom Installer': [
-      { name: 'tag', label: 'Tag', required: true },
-      { name: 'version', label: 'Version', required: true },
-      { name: 'branch', label: 'Branch', required: true },
-      { name: 'masterPRNumber', label: 'Master PR Number', required: true },
-      { name: 'repo', label: 'Repo', required: true },
-      { name: 'customRepo', label: 'Custom Repo', required: true },
-      { name: 'customBranch', label: 'Custom Branch', required: true },
+      { name: 'productTag', label: 'Product Tag', required: true },
+      { name: 'productVersion', label: 'Product Version', required: true },
+      { name: 'productPreviousVersion', label: 'Product Previous Version', required: true },
+      { name: 'productBranch', label: 'Product Branch', required: true },
+      { name: 'productMasterPRNumber', label: 'Product Master PR Number', required: true },
+      { name: 'productRepo', label: 'Product Repo', required: true }
+      ],
+    'Custom Installer': [
       { name: 'customTag', label: 'Custom Tag', required: true },
       { name: 'customVersion', label: 'Custom Version', required: true },
+      { name: 'customBranch', label: 'Custom Branch', required: true },
+      { name: 'customRepo', label: 'Custom Repo', required: true }
+    ],
+    'Platform Installer': [
+      { name: 'platformTag', label: 'Platform Tag', required: true },
+      { name: 'platformVersion', label: 'Platform Version', required: true },
+      { name: 'platformBranch', label: 'Platform Branch', required: true },
+      { name: 'platformRepo', label: 'Platform Repo', required: true }
+    ],
+    'Scheme Installer': [
+        { name: 'schemeTag', label: 'Scheme Tag', required: true },
+        { name: 'schemeVersion', label: 'Scheme Version', required: true },
+        { name: 'previousSchemeVersion', label: 'Previous Scheme Version', required: true },
+        { name: 'schemeBranch', label: 'Scheme Branch', required: true },
+        { name: 'schemeRepo', label: 'Scheme Repo', required: true },
+        { name: 'bank', label: 'Bank', required: true }
+      ],
+    'Project Installer': [
+      { name: 'projectTag', label: 'Project Tag', required: true },
+      { name: 'projectVersion', label: 'Project Version', required: true },
+      { name: 'previousprojectVersion', label: 'Previous Project Version', required: true },
+      { name: 'projectBranch', label: 'Project Branch', required: true },
+      { name: 'projectRepo', label: 'Project Repo', required: true },
+      { name: 'projectCollection', label: 'Project Collection', required: true },
       { name: 'bank', label: 'Bank', required: true }
     ],
-    'Product with Product Custom and Product Scheme Installer': [
-      { name: 'tag', label: 'Tag', required: true },
-      { name: 'version', label: 'Version', required: true },
-      { name: 'branch', label: 'Branch', required: true },
-      { name: 'masterPRNumber', label: 'Master PR Number', required: true },
-      { name: 'repo', label: 'Repo', required: true },
-      { name: 'customRepo', label: 'Custom Repo', required: true },
-      { name: 'customBranch', label: 'Custom Branch', required: true },
+
+  };
+
+  const upgraderFields = {
+    'Product Upgrader': [
+      { name: 'productTag', label: 'Product Tag', required: true },
+      { name: 'productVersion', label: 'Product Version', required: true },
+      { name: 'productPreviousVersion', label: 'Product Previous Version', required: true },
+      { name: 'productBranch', label: 'Product Branch', required: true },
+      { name: 'productMasterPRNumber', label: 'Product Master PR Number', required: true },
+      { name: 'productRepo', label: 'Product Repo', required: true }
+      ],
+    'Custom Upgrader': [
       { name: 'customTag', label: 'Custom Tag', required: true },
       { name: 'customVersion', label: 'Custom Version', required: true },
-      { name: 'bank', label: 'Bank', required: true },
-      { name: 'schemeRepo', label: 'Scheme Repo', required: true },
-      { name: 'schemeTag', label: 'Scheme Tag', required: true },
-      { name: 'schemeVersion', label: 'Scheme Version', required: true },
-      { name: 'schemeBranch', label: 'Scheme Branch', required: true }
+      { name: 'customBranch', label: 'Custom Branch', required: true },
+      { name: 'customRepo', label: 'Custom Repo', required: true }
     ],
-    'Product with Platform Tag Installer': [
-      { name: 'tag', label: 'Tag', required: true },
-      { name: 'version', label: 'Version', required: true },
-      { name: 'branch', label: 'Branch', required: true },
-      { name: 'masterPRNumber', label: 'Master PR Number', required: true },
-      { name: 'repo', label: 'Repo', required: true },
-      { name: 'bank', label: 'Bank', required: true },
-      { name: 'platformRepo', label: 'Platform Repo', required: true },
+    'Platform Upgrader': [
+      { name: 'platformTag', label: 'Platform Tag', required: true },
+      { name: 'platformVersion', label: 'Platform Version', required: true },
       { name: 'platformBranch', label: 'Platform Branch', required: true },
-      { name: 'platformTag', label: 'Platform Tag', required: true }
+      { name: 'platformRepo', label: 'Platform Repo', required: true }
     ],
-    'Product with Project Tag Installer': [
-      { name: 'tag', label: 'Tag', required: true },
-      { name: 'version', label: 'Version', required: true },
-      { name: 'branch', label: 'Branch', required: true },
-      { name: 'masterPRNumber', label: 'Master PR Number', required: true },
-      { name: 'repo', label: 'Repo', required: true },
+    'Scheme Upgrader': [
+        { name: 'schemeTag', label: 'Scheme Tag', required: true },
+        { name: 'schemeVersion', label: 'Scheme Version', required: true },
+        { name: 'previousSchemeVersion', label: 'Previous Scheme Version', required: true },
+        { name: 'schemeBranch', label: 'Scheme Branch', required: true },
+        { name: 'schemeRepo', label: 'Scheme Repo', required: true },
+        { name: 'bank', label: 'Bank', required: true }
+      ],
+    'Project Upgrader': [
+      { name: 'projectTag', label: 'Project Tag', required: true },
+      { name: 'projectVersion', label: 'Project Version', required: true },
+      { name: 'previousprojectVersion', label: 'Previous Project Version', required: true },
+      { name: 'projectBranch', label: 'Project Branch', required: true },
       { name: 'projectRepo', label: 'Project Repo', required: true },
-      { name: 'projectName', label: 'Project Name', required: true },
-      { name: 'projectBranchName', label: 'Project Branch Name', required: true },
-      { name: 'projectCurrentVersion', label: 'Project Current Version', required: true }
+      { name: 'projectCollection', label: 'Project Collection', required: true },
+      { name: 'bank', label: 'Bank', required: true }
+    ],
+  };
+
+  
+
+  // Previous functions remain the same...
+  const getAvailableTypes = () => {
+    if (!selectedProject || !requestType) return {};
     
-    ]
-    // Additional installer types...
+    if (selectedProject === 'Sparrow') {
+      if (requestType === 'patch') {
+        return { 'Product Patch': patchFields['Product Patch'] };
+      } else if (requestType === 'installer') {
+        return { 'Product Installer': installerFields['Product Installer'] };
+      } else if (requestType === 'upgrader') {
+        return { 'Product Upgrader': upgraderFields['Product Upgrader'] };
+      }
+    }
+    
+    return requestType === 'patch'
+    ? patchFields
+    : requestType === 'installer'
+    ? installerFields
+    : upgraderFields;
+  
   };
 
   const handleInputChange = (e) => {
@@ -148,148 +174,210 @@ const RequestPage = () => {
     });
   };
 
+  const handleTypeChange = (e) => {
+    const type = e.target.value;
+    if (e.target.checked) {
+      setSelectedTypes([...selectedTypes, type]);
+    } else {
+      setSelectedTypes(selectedTypes.filter(t => t !== type));
+    }
+    setFormData({});
+  };
+
+  const handleProjectChange = (e) => {
+    setSelectedProject(e.target.value);
+    setRequestType('');
+    setSelectedTypes([]);
+    setFormData({});
+  };
+
+  const handleRequestTypeChange = (e) => {
+    setRequestType(e.target.value);
+    setSelectedTypes([]);
+    setFormData({});
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
-    console.log('Form submitted:', formData);
+    console.log('Form submitted:', {
+      project: selectedProject,
+      requestType,
+      selectedTypes,
+      formData
+    });
+  };
+
+   // Theme-based style classes
+   const themeClasses = {
+    mainBackground: isDarkMode ? 'bg-gray-900' : 'bg-gray-100',
+    sidebar: isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200',
+    card: isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200',
+    text: isDarkMode ? 'text-gray-100' : 'text-gray-900',
+    textMuted: isDarkMode ? 'text-gray-300' : 'text-gray-600',
+    input: isDarkMode 
+      ? 'bg-gray-700 border-gray-600 text-gray-200 focus:ring-blue-500' 
+      : 'bg-white border-gray-300 text-gray-900 focus:ring-blue-500',
+    inputLabel: isDarkMode ? 'text-gray-200' : 'text-gray-700',
+    navItem: isDarkMode 
+      ? 'text-gray-300 hover:bg-gray-700' 
+      : 'text-gray-600 hover:bg-gray-100',
+    button: isDarkMode 
+      ? 'bg-blue-500 text-white hover:bg-blue-600' 
+      : 'bg-blue-600 text-white hover:bg-blue-700',
   };
 
   return (
-    <div className="flex h-screen bg-gray-900">
-      <div className="w-64 bg-gray-800 border-r border-gray-700">
+    <div className={`flex h-screen ${themeClasses.mainBackground}`}>
+      {/* Sidebar Navigation */}
+      <div className={`w-64 border-r transition-colors duration-200 ${themeClasses.sidebar}`}>
         <div className="p-4">
-          <h2 className="text-xl font-bold mb-8 text-gray-100">Patch Manager</h2>
+          <div className="flex justify-between items-center mb-8">
+            <h2 className={`text-xl font-bold ${themeClasses.text}`}>Patch Manager</h2>
+            <button
+              onClick={toggleTheme}
+              className={`p-2 rounded-full ${themeClasses.navItem}`}
+            >
+              {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
+            </button>
+          </div>
           <nav className="space-y-2">
-            <div className="flex items-center p-2 text-gray-300 hover:bg-gray-700 rounded cursor-pointer">
+            <div 
+              className={`flex items-center p-2 rounded cursor-pointer ${themeClasses.navItem}`}
+              onClick={() => navigate('/dashboard')}
+            >
+              <BarChart className="mr-2" size={20} />
               <span>Dashboard</span>
             </div>
-            {/* Additional navigation items */}
+            <div 
+              className={`flex items-center p-2 rounded cursor-pointer ${themeClasses.navItem}`}
+              onClick={() => navigate('/requests')}
+            >
+              <Inbox className="mr-2" size={20} />
+              <span>Requests</span>
+            </div>
+            <div 
+              className={`flex items-center p-2 rounded cursor-pointer ${themeClasses.navItem}`}
+              onClick={() => navigate('/schedule')}
+            >
+              <Calendar className="mr-2" size={20} />
+              <span>Schedule</span>
+            </div>
+            <div className={`flex items-center p-2 rounded cursor-pointer ${themeClasses.navItem}`}>
+              <Users className="mr-2" size={20} />
+              <span>Teams</span>
+            </div>
+            <div className={`flex items-center p-2 rounded cursor-pointer ${themeClasses.navItem}`}>
+              <Settings className="mr-2" size={20} />
+              <span>Settings</span>
+            </div>
           </nav>
         </div>
       </div>
 
-      <div className="flex-1 p-8 overflow-auto bg-gray-900">
-        <h1 className="text-2xl font-bold mb-6 text-gray-100">Request Form</h1>
+      {/* Main Content */}
+      <div className={`flex-1 p-8 overflow-auto ${themeClasses.mainBackground}`}>
+        <h1 className={`text-2xl font-bold mb-6 ${themeClasses.text}`}>Request Form</h1>
         
-        <Card className="bg-gray-800 border-gray-700">
+        <Card className={themeClasses.card}>
           <CardHeader>
-            <CardTitle className="text-gray-100">New Request</CardTitle>
+            <CardTitle className={themeClasses.text}>New Request</CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Project Selection */}
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-200">
-                  Request Type*
+                <label className={`block text-sm font-medium ${themeClasses.inputLabel}`}>
+                  Product
                 </label>
                 <select
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={requestType}
-                  onChange={(e) => {
-                    setRequestType(e.target.value);
-                    setSelectedSubType('');
-                    setSelectedInstallerType('');
-                    setFormData({});
-                  }}
+                  className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${themeClasses.input}`}
+                  value={selectedProject}
+                  onChange={handleProjectChange}
                   required
                 >
-                  <option value="">Select Request Type</option>
-                  <option value="installer">Installer</option>
-                  <option value="patch">Patch</option>
-                  <option value="upgrader">Upgrader</option>
+                  <option value="">Select Product</option>
+                  {Object.keys(projectConfigs).map(project => (
+                    <option key={project} value={project}>{project}</option>
+                  ))}
                 </select>
               </div>
 
-              {requestType === 'patch' && (
+              {/* Request Type Selection */}
+              {selectedProject && (
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-200">
-                    Patch Type*
+                  <label className={`block text-sm font-medium ${themeClasses.inputLabel}`}>
+                    Request Type
                   </label>
                   <select
-                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    value={selectedSubType}
-                    onChange={(e) => {
-                      setSelectedSubType(e.target.value);
-                      setFormData({});
-                    }}
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${themeClasses.input}`}
+                    value={requestType}
+                    onChange={handleRequestTypeChange}
                     required
                   >
-                    <option value="">Select Patch Type</option>
-                    {Object.keys(patchFields).map(type => (
-                      <option key={type} value={type}>{type}</option>
+                    <option value="">Select Request Type</option>
+                    {projectConfigs[selectedProject].map(type => (
+                      <option key={type} value={type}>
+                        {type.charAt(0).toUpperCase() + type.slice(1)}
+                      </option>
                     ))}
                   </select>
                 </div>
               )}
 
-              {requestType === 'patch' && selectedSubType && patchFields[selectedSubType] && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {patchFields[selectedSubType].map(field => (
-                    <div key={field.name} className="space-y-2">
-                      <label className="block text-sm font-medium text-gray-200">
-                        {field.label}{field.required && '*'}
-                      </label>
-                      <input
-                        type="text"
-                        name={field.name}
-                        value={formData[field.name] || ''}
-                        onChange={handleInputChange}
-                        required={field.required}
-                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {requestType === 'installer' && (
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-200">
-                    Installer Type*
-                  </label>
-                  <select
-                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    value={selectedInstallerType}
-                    onChange={(e) => {
-                      setSelectedInstallerType(e.target.value);
-                      setFormData({});
-                    }}
-                    required
-                  >
-                    <option value="">Select Installer Type</option>
-                    {Object.keys(installerFields).map(type => (
-                      <option key={type} value={type}>{type}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {requestType === 'installer' && selectedInstallerType && installerFields[selectedInstallerType] && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {installerFields[selectedInstallerType].map(field => (
-                    <div key={field.name} className="space-y-2">
-                      <label className="block text-sm font-medium text-gray-200">
-                        {field.label}{field.required && '*'}
-                      </label>
-                      <input
-                        type="text"
-                        name={field.name}
-                        value={formData[field.name] || ''}
-                        onChange={handleInputChange}
-                        required={field.required}
-                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
-
+              {/* Type Checkboxes */}
               {requestType && (
-                (requestType === 'patch' && selectedSubType) ||
-                (requestType === 'installer' && selectedInstallerType)
-              ) && (
+                <div className="space-y-2">
+                  <label className={`block text-sm font-medium ${themeClasses.inputLabel}`}>
+                    {requestType === 'patch' ? 'Patch Types' : 'Installer Types'}
+                  </label>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {Object.keys(getAvailableTypes()).map(type => (
+                      <div key={type} className="flex items-center">
+                        <input
+                          type="checkbox"
+                          name="types"
+                          value={type}
+                          checked={selectedTypes.includes(type)}
+                          onChange={handleTypeChange}
+                          className="mr-2 text-blue-500 focus:ring-blue-500"
+                        />
+                        <label className={themeClasses.textMuted}>{type}</label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Form Fields */}
+              {selectedTypes.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {selectedTypes.flatMap(type => {
+                    const fields = getAvailableTypes()[type];
+                    return fields.map(field => (
+                      <div key={`${type}-${field.name}`} className="space-y-2">
+                        <label className={`block text-sm font-medium ${themeClasses.inputLabel}`}>
+                          {field.label}{field.required && '*'}
+                        </label>
+                        <input
+                          type="text"
+                          name={field.name}
+                          value={formData[field.name] || ''}
+                          onChange={handleInputChange}
+                          required={field.required}
+                          className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${themeClasses.input}`}
+                        />
+                      </div>
+                    ));
+                  })}
+                </div>
+              )}
+
+              {/* Submit Button */}
+              {selectedTypes.length > 0 && (
                 <div className="flex justify-end">
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+                    className={`px-4 py-2 rounded-md ${themeClasses.button}`}
                   >
                     Submit
                   </button>
@@ -301,7 +389,6 @@ const RequestPage = () => {
       </div>
     </div>
   );
-
 };
 
 export default RequestPage;
