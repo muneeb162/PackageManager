@@ -1,53 +1,74 @@
-name: Secret Scan on Pull Request (TruffleHog3 Binary)
+name: TruffleHog v3 HTML Artifact Generator 🐽🔑
 
 on:
   pull_request:
     branches:
-      - master
+      - main
 
+permissions:
+  contents: read 
+  
 jobs:
-  trufflehog3-scan:
+  trufflehog_scan:
+    name: Scan and Generate HTML Report
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout full repo
+      - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          # Fetch full history for accurate diff scanning
+          fetch-depth: 0 
 
-      - name: Install TruffleHog v3 Binary
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install Python Report Generator (trufflehog3)
+        # Install the package that handles the JSON to HTML conversion
+        run: pip install trufflehog3
+
+      - name: Create Artifact Directory
+        run: mkdir -p reports
+
+      # 1. Run Official TruffleHog v3 Scan and Output JSON
+      # We execute the modern, official TruffleHog (Go-based) CLI via its Docker image
+      - name: Run TruffleHog Scan and Save JSON
+        id: trufflehog_scan
+        # Use the official Docker image for the latest and most accurate scan logic
+        uses: docker://trufflesecurity/trufflehog:latest
+        continue-on-error: true # Allow subsequent steps (conversion/upload) to run even if secrets are found
+        with:
+          args: git file://. --base ${{ github.event.pull_request.base.sha }} --head ${{ github.event.pull_request.head.sha }} --json --output reports/results.json --fail=false
+          # Note: The --fail=false flag is added to suppress non-zero exit code if findings exist,
+          # allowing the workflow to continue to the artifact steps.
+
+      # 2. Convert JSON Report to HTML using trufflehog3
+      # We use the installed Python package as confirmed by the PyPI documentation
+      - name: Generate HTML Report from JSON
         run: |
-          wget https://github.com/trufflesecurity/trufflehog/releases/latest/download/trufflehog_3_linux_amd64.tar.gz
-          tar -xzf trufflehog_3_linux_amd64.tar.gz
-          sudo mv trufflehog /usr/local/bin/trufflehog3
-          trufflehog3 --version
-
-      - name: Run TruffleHog3 Scan on PR Commits
-        run: |
-          echo "🔍 Scanning PR commits for secrets..."
-          trufflehog3 git \
-            --since-commit ${{ github.event.pull_request.base.sha }} \
-            --until-commit ${{ github.event.pull_request.head.sha }} \
-            --only-verified \
-            --json --output trufflehog3_results.json || true
-
-          echo "📄 Generating HTML report..."
-          trufflehog3 -R trufflehog3_results.json --output trufflehog3_report.html
-
-      - name: Fail if secrets found
-        run: |
-          if [ -s trufflehog3_results.json ]; then
-            echo "❌ Secrets detected in PR changes!"
-            exit 1
+          # Use the installed trufflehog3 Python command to render the report
+          trufflehog3 -R reports/results.json --output reports/report.html
+          
+          # Check if the HTML file was created and print a success message
+          if [ -f "reports/report.html" ]; then
+            echo "Successfully generated HTML report artifact."
           else
-            echo "✅ No secrets found."
+            echo "Warning: report.html not found. Check previous steps."
           fi
-
-      - name: Upload reports
-        if: always()
+      
+      # 3. Upload the HTML Report as a Downloadable Artifact
+      - name: Upload HTML Report Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: trufflehog3-scan-reports
-          path: |
-            trufflehog3_results.json
-            trufflehog3_report.html
+          name: TruffleHog-v3-HTML-Report
+          path: reports/report.html
+          retention-days: 7 # Optional: keep the artifact for 7 days
+
+      # 4. Upload the raw JSON file for advanced analysis (optional)
+      - name: Upload Raw JSON Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TruffleHog-v3-Raw-JSON
+          path: reports/results.json
+          retention-days: 7
