@@ -3,7 +3,7 @@ name: Secret Scan on PR (TruffleHog)
 on:
   pull_request:
     branches:
-      - master
+      - master  # or main, depending on your repo default
 
 jobs:
   trufflehog-scan:
@@ -19,32 +19,43 @@ jobs:
       - name: Install TruffleHog v3
         run: |
           python3 -m pip install --upgrade pip
-          pip install trufflehog
+          pip install trufflehog jq
 
       - name: Run TruffleHog scan on PR diff
         id: trufflehog
         run: |
           echo "🔍 Running TruffleHog scan on PR changes..."
 
-          # Determine target branch (main) and current branch
-          TARGET_BRANCH="origin/${{ github.base_ref }}"
-          CURRENT_BRANCH="${{ github.head_ref }}"
+          BASE_BRANCH=${{ github.base_ref }}
+          HEAD_BRANCH=${{ github.head_ref }}
+          echo "Comparing origin/$BASE_BRANCH...$HEAD_BRANCH"
 
-          echo "Comparing ${TARGET_BRANCH}...${CURRENT_BRANCH}"
+          # Fetch both branches
+          git fetch origin $BASE_BRANCH
+          git fetch origin $HEAD_BRANCH
 
-          # Generate JSON report
+          # Get base commit hash
+          BASE_COMMIT=$(git merge-base origin/$BASE_BRANCH origin/$HEAD_BRANCH)
+          echo "Base commit: $BASE_COMMIT"
+
+          # Run TruffleHog to scan changes since base commit
           trufflehog git \
             --json \
-            --branch $CURRENT_BRANCH \
-            https://github.com/${{ github.repository }}.git \
-            > trufflehog_report.json || true
+            --since-commit $BASE_COMMIT \
+            --branch $HEAD_BRANCH \
+            . > trufflehog_report.json || true
 
-          # Generate simple HTML report
-          echo "<html><head><title>TruffleHog Report</title></head><body><h1>TruffleHog Secrets Scan Report</h1><pre>" > trufflehog_report.html
+          # Make a clean HTML report
+          echo "<html><head><title>TruffleHog Report</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            h1 { color: #444; }
+            pre { background: #f4f4f4; padding: 10px; border-radius: 8px; }
+          </style></head><body><h1>🔐 TruffleHog Secrets Scan Report</h1><pre>" > trufflehog_report.html
           cat trufflehog_report.json | jq . >> trufflehog_report.html
           echo "</pre></body></html>" >> trufflehog_report.html
 
-          # Fail if any secrets found
+          # Fail pipeline if secrets are found
           if grep -q '"SourceMetadata"' trufflehog_report.json; then
             echo "::error::⚠️ Secrets found in PR! Check trufflehog_report.html"
             exit 1
