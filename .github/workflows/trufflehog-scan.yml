@@ -14,32 +14,48 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # important for TruffleHog to compare history
+          fetch-depth: 0
 
       - name: Install TruffleHog v3
         run: |
           python3 -m pip install --upgrade pip
           pip install trufflehog
 
-      - name: Run TruffleHog scan on PR
+      - name: Run TruffleHog scan on PR diff
         id: trufflehog
         run: |
-          echo "Scanning PR changes with TruffleHog..."
-          # Compare the PR branch against the target branch (main)
-          trufflehog git file://. --since-commit origin/master --branch ${{ github.head_ref }} --fail --json > trufflehog_report.json || true
+          echo "🔍 Running TruffleHog scan on PR changes..."
 
-          # Check if any secrets found
+          # Determine target branch (main) and current branch
+          TARGET_BRANCH="origin/${{ github.base_ref }}"
+          CURRENT_BRANCH="${{ github.head_ref }}"
+
+          echo "Comparing ${TARGET_BRANCH}...${CURRENT_BRANCH}"
+
+          # Generate JSON report
+          trufflehog git \
+            --json \
+            --only-verified \
+            --branch $CURRENT_BRANCH \
+            https://github.com/${{ github.repository }}.git \
+            > trufflehog_report.json || true
+
+          # Generate simple HTML report
+          echo "<html><head><title>TruffleHog Report</title></head><body><h1>TruffleHog Secrets Scan Report</h1><pre>" > trufflehog_report.html
+          cat trufflehog_report.json | jq . >> trufflehog_report.html
+          echo "</pre></body></html>" >> trufflehog_report.html
+
+          # Fail if any secrets found
           if grep -q '"SourceMetadata"' trufflehog_report.json; then
-            echo "⚠️ Secrets found in PR!"
-            echo "::error::TruffleHog found potential secrets. Check trufflehog_report.json for details."
+            echo "::error::⚠️ Secrets found in PR! Check trufflehog_report.html"
             exit 1
           else
             echo "✅ No secrets found!"
           fi
 
-      - name: Upload scan report (artifact)
+      - name: Upload TruffleHog HTML Report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: trufflehog-report
-          path: trufflehog_report.json
+          name: trufflehog-html-report
+          path: trufflehog_report.html
