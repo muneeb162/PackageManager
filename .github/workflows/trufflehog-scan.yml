@@ -33,14 +33,19 @@ jobs:
 
       - name: Run trufflehog3 scan
         run: |
-          trufflehog3 --format JSON -o trufflehog_reports/report.json . 
+          trufflehog3 --zero --format JSON -o trufflehog_reports/report.json . 
 
       # 2. Convert JSON Report to HTML using trufflehog3
       - name: Generate HTML Report from JSON
         run: |
           # Use the installed trufflehog3 Python command to render the report
           trufflehog3 -R trufflehog_reports/results.json --output trufflehog_reports/report.html
-      
+
+      - name: get json
+        run: |
+          cat trufflehog_reports/report.html
+          cat trufflehog_reports/report.json
+          
       # 3. Upload the HTML Report as a Downloadable Artifact
       - name: Upload HTML Report Artifact
         uses: actions/upload-artifact@v4
