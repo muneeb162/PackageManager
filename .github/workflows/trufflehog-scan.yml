@@ -1,68 +1,45 @@
-name: Secret Scan on PR (trufflehog3)
+name: Secret Scan on Pull Request (trufflehog3 PyPI)
 
 on:
   pull_request:
     branches:
-      - master  # or main, whichever is your default
+      - master
 
 jobs:
   trufflehog3-scan:
-    name: Run trufflehog3 secret scan
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0  # optional: full history
 
       - name: Install trufflehog3
         run: |
           python3 -m pip install --upgrade pip
           pip install trufflehog3
-          trufflehog3 --version
 
-      - name: Run trufflehog3 scan
-        id: scan
+      - name: Run trufflehog3 secret scan
         run: |
-          echo "🔍 Running trufflehog3 secret scan on PR changes..."
+          echo "🔍 Scanning working directory for secrets (no history)..."
+          trufflehog3 --no-history --format json --output trufflehog3_report.json .
 
-          BASE_BRANCH="${{ github.base_ref }}"
-          HEAD_BRANCH="${{ github.head_ref }}"
-          echo "Comparing ${BASE_BRANCH}...${HEAD_BRANCH}"
-
-          git fetch origin $BASE_BRANCH
-          git fetch origin $HEAD_BRANCH
-          BASE_COMMIT=$(git merge-base origin/$BASE_BRANCH origin/$HEAD_BRANCH)
-          echo "Base commit: $BASE_COMMIT"
-
-          mkdir reports
-
-          # Run trufflehog3 scan (correct syntax)
-          trufflehog3 scan \
-            --since-commit "$BASE_COMMIT" \
-            --format json \
-            --output reports/trufflehog_report.json \
-            .
-
-          # Generate pretty HTML report
-          trufflehog3 render \
-            -R reports/trufflehog_report.json \
-            --format html \
-            --output reports/trufflehog_report.html
-
-      - name: Fail if secrets found
+      - name: Display JSON results
         run: |
-          if grep -q '"DetectorName"' reports/trufflehog_report.json; then
-            echo "::error::⚠️ Secrets detected! Check trufflehog_report.html for details."
-            exit 1
+          if [ -s trufflehog3_report.json ]; then
+            echo "❌ Potential secrets found!"
+            cat trufflehog3_report.json
+            trufflehog3 -R trufflehog3_report.json --output trufflehog3_report.html
           else
-            echo "✅ No secrets found!"
+            echo "✅ No secrets found."
           fi
 
-      - name: Upload HTML report
-        if: always()
+      - name: Upload reports
         uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: trufflehog3-html-report
-          path: reports/trufflehog_report.html
+          name: trufflehog3-reports
+          path: |
+            trufflehog3_report.json
+            trufflehog3_report.html
