@@ -1,0 +1,42 @@
+name: Secret Scan on PR (TruffleHog)
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  trufflehog-scan:
+    name: Run TruffleHog v3 on PR changes
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # important for TruffleHog to compare history
+
+      - name: Install TruffleHog v3
+        run: |
+          python3 -m pip install --upgrade pip
+          pip install trufflehog
+
+      - name: Run TruffleHog scan on PR
+        id: trufflehog
+        run: |
+          echo "Scanning PR changes with TruffleHog..."
+          trufflehog git file://. --since-commit origin/main --branch ${{ github.head_ref }} --fail --json > trufflehog_report.json || true
+
+          if grep -q '"SourceMetadata"' trufflehog_report.json; then
+            echo "::error::⚠️ Secrets found in PR! See trufflehog_report.json for details."
+            exit 1
+          else
+            echo "✅ No secrets found!"
+          fi
+
+      - name: Upload scan report (artifact)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trufflehog-report
+          path: trufflehog_report.json
