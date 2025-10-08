@@ -3,7 +3,7 @@ name: TruffleHog v3 HTML Artifact Generator 🐽🔑
 on:
   pull_request:
     branches:
-      - main
+      - master
 
 permissions:
   contents: read 
