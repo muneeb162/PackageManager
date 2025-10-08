@@ -50,3 +50,12 @@ jobs:
         with:
           name: TruffleHog-v3-Raw-JSON
           path: trufflehog_reports/report.json
+
+      - name: Fail if secrets found
+        run: |
+          if grep -q '"severity":' trufflehog_reports/report.json; then
+            echo "❌ Potential secrets detected! Check trufflehog_reports/report.json"
+            exit 1
+          else
+            echo "✅ No secrets found."
+          fi
