@@ -3,7 +3,7 @@ name: Secret Scan on PR (TruffleHog)
 on:
   pull_request:
     branches:
-      - master  # or main, depending on your repo default
+      - master  # or 'main' depending on your repo
 
 jobs:
   trufflehog-scan:
@@ -14,7 +14,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0  # needed so we can compare commits
 
       - name: Install TruffleHog v3
         run: |
@@ -28,24 +28,22 @@ jobs:
 
           BASE_BRANCH=${{ github.base_ref }}
           HEAD_BRANCH=${{ github.head_ref }}
+
           echo "Comparing origin/$BASE_BRANCH...$HEAD_BRANCH"
 
-          # Fetch both branches
           git fetch origin $BASE_BRANCH
           git fetch origin $HEAD_BRANCH
 
-          # Get base commit hash
           BASE_COMMIT=$(git merge-base origin/$BASE_BRANCH origin/$HEAD_BRANCH)
           echo "Base commit: $BASE_COMMIT"
 
-          # Run TruffleHog to scan changes since base commit
-          trufflehog git \
-            --json \
+          # ✅ Correct syntax — local repo path instead of GitHub URL
+          trufflehog git . \
             --since-commit $BASE_COMMIT \
             --branch $HEAD_BRANCH \
-            . > trufflehog_report.json || true
+            --json > trufflehog_report.json || true
 
-          # Make a clean HTML report
+          # 🧾 Generate human-friendly HTML report
           echo "<html><head><title>TruffleHog Report</title>
           <style>
             body { font-family: Arial, sans-serif; margin: 20px; }
@@ -55,7 +53,7 @@ jobs:
           cat trufflehog_report.json | jq . >> trufflehog_report.html
           echo "</pre></body></html>" >> trufflehog_report.html
 
-          # Fail pipeline if secrets are found
+          # ❌ Fail workflow if secrets found
           if grep -q '"SourceMetadata"' trufflehog_report.json; then
             echo "::error::⚠️ Secrets found in PR! Check trufflehog_report.html"
             exit 1
