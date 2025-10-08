@@ -148,3 +148,33 @@
   message: Password in URL
   pattern: "[a-zA-Z]{3,10}://[^/\\s:@]{3,20}:[^/\\s:@]{3,20}@.{1,100}[\"'\\s]"
   severity: LOW
+
+- id: python-password-assignment
+  message: Password or secret assignment in Python
+  pattern: "(?i)\\b(?:password|pass|pwd|db_password|secret|api[_-]?key|apikey|auth[_-]?token|client[_-]?secret|access[_-]?token)\\s*[:=]\\s*['\"][^'\"]{4,}['\"]"
+  severity: MEDIUM
+
+- id: python-api-token
+  message: API token assignment in Python
+  pattern: "(?i)\\b(?:api_token|token|api[_-]?key|apikey|auth[_-]?token|access[_-]?token|client[_-]?secret)\\s*[:=]\\s*['\"]?[^'\"\\s]{4,}['\"]?"
+  severity: MEDIUM
+
+- id: mongodb-url
+  message: MongoDB URL or connection string
+  pattern: "(?i)\\b(?:mongodb_url|mongo_uri|mongo_url|connection_string|db_connection)\\s*[:=]\\s*['\"][^'\"]{8,}['\"]"
+  severity: MEDIUM
+
+- id: function-argument-secret
+  message: Secret passed as function argument
+  pattern: "(?i)\\w+\\([^)]*\\b(?:password|pass|pwd|secret|token|api[_-]?token|apikey|client[_-]?secret|access[_-]?token)\\s*=\\s*['\"][^'\"]{4,}['\"][^)]*\\)"
+  severity: MEDIUM
+
+- id: env-var-style-secret
+  message: Environment variable style secret
+  pattern: "(?m)(?i)^(?:PASSWORD|PASS|PWD|SECRET|API_KEY|API-KEY|APIKEY|AUTH_TOKEN|ACCESS_TOKEN|CLIENT_SECRET|DB_PASSWORD|DB_PASS|MONGO_URI|MONGO_URL|CONNECTION_STRING|TOKEN|APISECRET)\\s*=\\s*([^\\n\\r]{4,})"
+  severity: MEDIUM
+
+- id: json-style-key
+  message: JSON key with secret
+  pattern: "(?i)\"(?:password|pass|pwd|secret|api[_-]?key|apikey|auth[_-]?token|client[_-]?secret|db[_-]?password|access[_-]?token|token)\"\\s*:\\s*\"([^\\\"]{4,})\""
+  severity: MEDIUM
