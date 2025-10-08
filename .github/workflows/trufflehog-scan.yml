@@ -1,4 +1,4 @@
-name: Secret Scan on Pull Request (trufflehog3 PyPI)
+name: Secret Scan on Pull Request (TruffleHog3 Binary)
 
 on:
   pull_request:
@@ -10,36 +10,44 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout full repo
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # optional: full history
+          fetch-depth: 0
 
-      - name: Install trufflehog3
+      - name: Install TruffleHog v3 Binary
         run: |
-          python3 -m pip install --upgrade pip
-          pip install trufflehog3
+          wget https://github.com/trufflesecurity/trufflehog/releases/latest/download/trufflehog_3_linux_amd64.tar.gz
+          tar -xzf trufflehog_3_linux_amd64.tar.gz
+          sudo mv trufflehog /usr/local/bin/trufflehog3
+          trufflehog3 --version
 
-      - name: Run trufflehog3 secret scan
+      - name: Run TruffleHog3 Scan on PR Commits
         run: |
-          echo "🔍 Scanning working directory for secrets (no history)..."
-          trufflehog3 --no-history --format json --output trufflehog3_report.json .
+          echo "🔍 Scanning PR commits for secrets..."
+          trufflehog3 git \
+            --since-commit ${{ github.event.pull_request.base.sha }} \
+            --until-commit ${{ github.event.pull_request.head.sha }} \
+            --only-verified \
+            --json --output trufflehog3_results.json || true
 
-      - name: Display JSON results
+          echo "📄 Generating HTML report..."
+          trufflehog3 -R trufflehog3_results.json --output trufflehog3_report.html
+
+      - name: Fail if secrets found
         run: |
-          if [ -s trufflehog3_report.json ]; then
-            echo "❌ Potential secrets found!"
-            cat trufflehog3_report.json
-            trufflehog3 -R trufflehog3_report.json --output trufflehog3_report.html
+          if [ -s trufflehog3_results.json ]; then
+            echo "❌ Secrets detected in PR changes!"
+            exit 1
           else
             echo "✅ No secrets found."
           fi
 
       - name: Upload reports
-        uses: actions/upload-artifact@v4
         if: always()
+        uses: actions/upload-artifact@v4
         with:
-          name: trufflehog3-reports
+          name: trufflehog3-scan-reports
           path: |
-            trufflehog3_report.json
+            trufflehog3_results.json
             trufflehog3_report.html
