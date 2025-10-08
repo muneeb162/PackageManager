@@ -1,4 +1,4 @@
-name: TruffleHog v3 HTML Artifact Generator 🐽🔑
+name: TruffleHog V3 Report
 
 on:
   pull_request:
@@ -16,7 +16,6 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          # Fetch full history for accurate diff scanning
           fetch-depth: 0 
 
       - name: Setup Python
@@ -25,7 +24,6 @@ jobs:
           python-version: '3.x'
 
       - name: Install Python Report Generator (trufflehog3)
-        # Install the Python package that converts JSON to HTML
         run: pip install trufflehog3
 
       - name: Create Artifact Directory
@@ -34,20 +32,12 @@ jobs:
       - name: Run trufflehog3 scan
         run: |
           trufflehog3 --zero --format JSON -o trufflehog_reports/report.json .
-          ls -ltr trufflehog_reports
-
-      # 2. Convert JSON Report to HTML using trufflehog3
-      - name: Generate HTML Report from JSON
-        run: |
-          # Use the installed trufflehog3 Python command to render the report
           trufflehog3 -R trufflehog_reports/report.json --output trufflehog_reports/report.html
 
-      - name: get json
-        run: |
-          cat trufflehog_reports/report.html
-          cat trufflehog_reports/report.json
+      # - name: Generate HTML Report from JSON
+      #   run: |
+      #     trufflehog3 -R trufflehog_reports/report.json --output trufflehog_reports/report.html
           
-      # 3. Upload the HTML Report as a Downloadable Artifact
       - name: Upload HTML Report Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -55,7 +45,6 @@ jobs:
           path: trufflehog_reports/report.html
           retention-days: 7
 
-      # 4. Upload the raw JSON file 
       - name: Upload Raw JSON Artifact
         uses: actions/upload-artifact@v4
         with:
