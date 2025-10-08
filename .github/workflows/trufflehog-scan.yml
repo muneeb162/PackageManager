@@ -14,29 +14,88 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # important for TruffleHog to compare history
+          fetch-depth: 0
 
-      - name: Install TruffleHog v3
+      - name: Install TruffleHog v3 and Python deps
         run: |
           python3 -m pip install --upgrade pip
           pip install trufflehog
 
-      - name: Run TruffleHog scan on PR
-        id: trufflehog
+      - name: Run TruffleHog and generate reports
         run: |
-          echo "Scanning PR changes with TruffleHog..."
-          trufflehog git file://. --since-commit origin/main --branch ${{ github.head_ref }} --fail --json > trufflehog_report.json || true
+          echo "🔍 Running TruffleHog scan on PR..."
+          trufflehog git file://. --since-commit origin/master --branch ${{ github.head_ref }} --json > trufflehog_report.json || true
+          trufflehog git file://. --since-commit origin/master --branch ${{ github.head_ref }} --json --sarif trufflehog.sarif || true
+
+          echo "📄 Generating presentable HTML report..."
+          cat <<'EOF' > generate_html.py
+          import json, html
+
+          with open("trufflehog_report.json") as f:
+              data = [json.loads(line) for line in f if line.strip()]
+
+          html_content = """<html>
+          <head>
+            <meta charset='UTF-8'>
+            <title>TruffleHog Secret Scan Report</title>
+            <style>
+              body { font-family: Arial, sans-serif; margin: 20px; }
+              h1 { color: #333; }
+              table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+              th, td { border: 1px solid #ddd; padding: 8px; }
+              th { background-color: #333; color: white; text-align: left; }
+              tr:nth-child(even) { background-color: #f2f2f2; }
+              .high { color: #d9534f; font-weight: bold; }
+              .medium { color: #f0ad4e; font-weight: bold; }
+              .low { color: #5bc0de; font-weight: bold; }
+              pre { background: #f8f8f8; padding: 10px; border-radius: 6px; overflow-x: auto; }
+            </style>
+          </head>
+          <body>
+            <h1>🔒 TruffleHog Secret Scan Report</h1>
+            <p>Scanned branch: <b>${{ github.head_ref }}</b></p>
+            <table>
+              <tr><th>#</th><th>File</th><th>Line</th><th>Detector</th><th>Raw Secret</th><th>Commit</th></tr>
+          """
+
+          if not data:
+              html_content += "<tr><td colspan='6' style='text-align:center;'>✅ No secrets found</td></tr>"
+          else:
+              for i, finding in enumerate(data, 1):
+                  meta = finding.get("SourceMetadata", {}).get("Data", {})
+                  detector = finding.get("DetectorName", "Unknown")
+                  file_path = meta.get("file", "N/A")
+                  line = meta.get("line", "N/A")
+                  secret = html.escape(finding.get("Raw", "")[:80]) + ("..." if len(finding.get("Raw", "")) > 80 else "")
+                  commit = meta.get("commit", "N/A")
+                  html_content += f"<tr><td>{i}</td><td>{file_path}</td><td>{line}</td><td>{detector}</td><td><pre>{secret}</pre></td><td>{commit}</td></tr>"
+
+          html_content += """</table>
+            <p style='margin-top:40px;font-size:0.9em;color:#666;'>Generated automatically by GitHub Actions using TruffleHog v3.</p>
+          </body></html>"""
+
+          with open("trufflehog_report.html", "w") as f:
+              f.write(html_content)
+          EOF
+
+          python3 generate_html.py
 
           if grep -q '"SourceMetadata"' trufflehog_report.json; then
-            echo "::error::⚠️ Secrets found in PR! See trufflehog_report.json for details."
+            echo "::error::⚠️ Secrets found in PR! See HTML report for details."
             exit 1
           else
             echo "✅ No secrets found!"
           fi
 
-      - name: Upload scan report (artifact)
+      - name: Upload HTML report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: trufflehog-report
-          path: trufflehog_report.json
+          name: trufflehog-html-report
+          path: trufflehog_report.html
+
+      - name: Upload SARIF to GitHub Security tab
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trufflehog.sarif
