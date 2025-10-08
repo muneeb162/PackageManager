@@ -11,161 +11,35 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # ------------------------------
-      # Checkout the pull request code
-      # ------------------------------
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # required for TruffleHog to diff against history
+          fetch-depth: 0  # important for TruffleHog to compare history
 
-      # ------------------------------
-      # Install TruffleHog and Python deps
-      # ------------------------------
       - name: Install TruffleHog v3
         run: |
           python3 -m pip install --upgrade pip
           pip install trufflehog
 
-      # ------------------------------
-      # Run TruffleHog and save JSON results
-      # ------------------------------
-      - name: Run TruffleHog scan
+      - name: Run TruffleHog scan on PR
+        id: trufflehog
         run: |
-          echo "🔍 Running TruffleHog scan on PR..."
-          trufflehog git file://. \
-            --since-commit origin/master \
-            --branch ${{ github.head_ref }} \
-            --json > trufflehog_report.json || true
+          echo "Scanning PR changes with TruffleHog..."
+          # Compare the PR branch against the target branch (main)
+          trufflehog git file://. --since-commit origin/master --branch ${{ github.head_ref }} --fail --json > trufflehog_report.json || true
 
-      # ------------------------------
-      # Generate HTML report from JSON
-      # ------------------------------
-      - name: Generate HTML report
-        run: |
-          cat <<'EOF' > generate_html.py
-          import json, html, os
+          # Check if any secrets found
+          if grep -q '"SourceMetadata"' trufflehog_report.json; then
+            echo "⚠️ Secrets found in PR!"
+            echo "::error::TruffleHog found potential secrets. Check trufflehog_report.json for details."
+            exit 1
+          else
+            echo "✅ No secrets found!"
+          fi
 
-          data = []
-          if os.path.exists("trufflehog_report.json"):
-              with open("trufflehog_report.json") as f:
-                  for line in f:
-                      if line.strip():
-                          try:
-                              data.append(json.loads(line))
-                          except json.JSONDecodeError:
-                              pass
-
-          html_content = """<html>
-          <head>
-            <meta charset='UTF-8'>
-            <title>TruffleHog Secret Scan Report</title>
-            <style>
-              body { font-family: Arial, sans-serif; margin: 20px; }
-              h1 { color: #333; }
-              table { border-collapse: collapse; width: 100%; margin-top: 20px; }
-              th, td { border: 1px solid #ddd; padding: 8px; }
-              th { background-color: #333; color: white; text-align: left; }
-              tr:nth-child(even) { background-color: #f2f2f2; }
-              pre { background: #f8f8f8; padding: 10px; border-radius: 6px; overflow-x: auto; }
-            </style>
-          </head>
-          <body>
-            <h1>🔒 TruffleHog Secret Scan Report</h1>
-            <p>Scanned branch: <b>${{ github.head_ref }}</b></p>
-            <table>
-              <tr><th>#</th><th>File</th><th>Line</th><th>Detector</th><th>Raw Secret</th><th>Commit</th></tr>
-          """
-
-          if not data:
-              html_content += "<tr><td colspan='6' style='text-align:center;'>✅ No secrets found</td></tr>"
-          else:
-              for i, finding in enumerate(data, 1):
-                  meta = finding.get("SourceMetadata", {}).get("Data", {})
-                  detector = finding.get("DetectorName", "Unknown")
-                  file_path = meta.get("file", "N/A")
-                  line = meta.get("line", "N/A")
-                  secret = html.escape(finding.get("Raw", "")[:80]) + ("..." if len(finding.get("Raw", "")) > 80 else "")
-                  commit = meta.get("commit", "N/A")
-                  html_content += f"<tr><td>{i}</td><td>{file_path}</td><td>{line}</td><td>{detector}</td><td><pre>{secret}</pre></td><td>{commit}</td></tr>"
-
-          html_content += """</table>
-            <p style='margin-top:40px;font-size:0.9em;color:#666;'>Generated automatically by GitHub Actions using TruffleHog v3.</p>
-          </body></html>"""
-
-          with open("trufflehog_report.html", "w") as f:
-              f.write(html_content)
-          EOF
-
-          python3 generate_html.py
-
-      # ------------------------------
-      # Convert JSON to SARIF format for GitHub Security tab
-      # ------------------------------
-      - name: Convert JSON to SARIF
-        run: |
-          cat <<'EOF' > json_to_sarif.py
-          import json, os
-          data = []
-          if os.path.exists("trufflehog_report.json"):
-              with open("trufflehog_report.json") as f:
-                  for line in f:
-                      if line.strip():
-                          try:
-                              data.append(json.loads(line))
-                          except json.JSONDecodeError:
-                              pass
-
-          sarif = {
-              "version": "2.1.0",
-              "runs": [{
-                  "tool": {
-                      "driver": {
-                          "name": "TruffleHog",
-                          "informationUri": "https://github.com/trufflesecurity/trufflehog"
-                      }
-                  },
-                  "results": []
-              }]
-          }
-
-          for finding in data:
-              meta = finding.get("SourceMetadata", {}).get("Data", {})
-              sarif["runs"][0]["results"].append({
-                  "ruleId": finding.get("DetectorName", "Unknown"),
-                  "message": {"text": f"Potential secret in {meta.get('file','N/A')}"},
-                  "locations": [{
-                      "physicalLocation": {
-                          "artifactLocation": {"uri": meta.get("file", "unknown")},
-                          "region": {"startLine": meta.get("line", 0)}
-                      }
-                  }]
-              })
-
-          # Always create SARIF (even if empty)
-          with open("trufflehog.sarif", "w") as f:
-              json.dump(sarif, f, indent=2)
-          EOF
-
-          python3 json_to_sarif.py
-          echo "✅ SARIF file generated successfully:"
-          ls -l trufflehog.sarif
-
-      # ------------------------------
-      # Upload HTML report artifact
-      # ------------------------------
-      - name: Upload HTML report
+      - name: Upload scan report (artifact)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: trufflehog-html-report
-          path: trufflehog_report.html
-
-      # ------------------------------
-      # Upload SARIF to GitHub Security tab
-      # ------------------------------
-      - name: Upload SARIF to GitHub Security tab
-        if: always()
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: trufflehog.sarif
+          name: trufflehog-report
+          path: trufflehog_report.json
