@@ -1,94 +1,27 @@
 [
   {
-    "regex": "(?i)\\b(?:password|pass|pwd|secret|secr|token|api[_-]?key|apikey|auth[_-]?token|access[_-]?token|client[_-]?secret|consumer[_-]?secret|private[_-]?key|privatekey|ssh[_-]?key|db[_-]?password|dbpass|mongo[_-]?uri|mongo[_-]?url|connection[_-]?string)\\s*[:=]\\s*['\\\"]([^'\\\"]{8,})['\\\"]",
-    "entropy": true
+    "pattern": "(?i)password\\s*=\\s*['\"][^'\"]+['\"]",
+    "entropy": true,
+    "severity": "HIGH"
   },
   {
-    "regex": "(?i)\\b(?:password|pass|pwd|secret|token|api[_-]?key|apikey|auth[_-]?token|access[_-]?token|client[_-]?secret|private[_-]?key|dbpass|mongo[_-]?uri|mongo[_-]?url|connection[_-]?string)\\s*[:=]\\s*([^\\s#;]{8,})",
-    "entropy": true
+    "pattern": "(?i)pwd\\s*=\\s*['\"][^'\"]+['\"]",
+    "entropy": true,
+    "severity": "HIGH"
   },
   {
-    "regex": "(?i)\\b\\w+\\s*\\([^\\)]*\\b(?:password|pass|pwd|token|api[_-]?token|secret|apikey|client[_-]?secret)\\s*=\\s*['\\\"]([^'\\\"]{6,})['\\\"][^\\)]*\\)",
-    "entropy": true
+    "pattern": "(?i)secret\\s*=\\s*['\"][^'\"]+['\"]",
+    "entropy": true,
+    "severity": "HIGH"
   },
   {
-    "regex": "(?m)(?i)^(?:\\s*)(?:PASSWORD|PASS|PWD|SECRET|API_KEY|API-KEY|APIKEY|AUTH_TOKEN|ACCESS_TOKEN|CLIENT_SECRET|DB_PASSWORD|DB_PASS|MONGO_URI|MONGO_URL|CONNECTION_STRING)\\s*=\\s*([^\\n\\r]{6,})",
-    "entropy": true
+    "pattern": "(?i)api[_-]?key\\s*[:=]\\s*['\"][^'\"]+['\"]",
+    "entropy": true,
+    "severity": "HIGH"
   },
   {
-    "regex": "(?i)\\bhttps?://[^\\s/:]+:[^\\s/@]+@[^\\s/]+",
-    "entropy": false
-  },
-  {
-    "regex": "(?i)(?:jdbc:|mongodb(?:\\+srv)?:|postgres(?:ql)?://|redis://)[^\\n\\r]{6,}",
-    "entropy": false
-  },
-  {
-    "regex": "\\b([A-Za-z0-9+/]{40,}={0,2})\\b",
-    "entropy": true
-  },
-  {
-    "regex": "\\b([0-9a-fA-F]{32,})\\b",
-    "entropy": true
-  },
-  {
-    "regex": "\\b([A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+)\\b|Bearer\\s+[A-Za-z0-9\\-._~+/]+=*",
-    "entropy": true
-  },
-  {
-    "regex": "\\bAKIA[0-9A-Z]{16}\\b",
-    "entropy": true
-  },
-  {
-    "regex": "(?i)aws[_-]?secret[_-]?access[_-]?key\\s*[:=]\\s*([A-Za-z0-9/+=]{24,})",
-    "entropy": true
-  },
-  {
-    "regex": "(?i)(Authorization\\s*:\\s*Bearer\\s+[A-Za-z0-9\\-._~+/]+=*|authorization\\s*=\\s*['\\\"][A-Za-z0-9\\-._~+/]+=*['\\\"])",
-    "entropy": true
-  },
-  {
-    "regex": "-----BEGIN (?:RSA |EC |DSA )?PRIVATE KEY-----[\\s\\S]{20,}-----END (?:RSA |EC |DSA )?PRIVATE KEY-----",
-    "entropy": false
-  },
-  {
-    "regex": "-----BEGIN OPENSSH PRIVATE KEY-----[\\s\\S]{20,}-----END OPENSSH PRIVATE KEY-----",
-    "entropy": false
-  },
-  {
-    "regex": "-----BEGIN PGP PRIVATE KEY BLOCK-----[\\s\\S]{20,}-----END PGP PRIVATE KEY BLOCK-----",
-    "entropy": false
-  },
-  {
-    "regex": "\\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\b",
-    "entropy": true
-  },
-  {
-    "regex": "(?i)\\b(token|api[_-]?key|apikey|auth|secret)\\b\\s*[:=]\\s*['\\\"]?([A-Za-z0-9\\-_\\.\\=]{6,})['\\\"]?",
-    "entropy": true
-  },
-  {
-    "regex": "\\b([A-Za-z0-9+/=]{20,})\\b",
-    "entropy": true
-  },
-  {
-    "regex": "(?i)\\b(password|pwd|pass|secret)\\b\\s*[:=]\\s*['\\\"]?([^'\\\"\\s]{4,})['\\\"]?",
-    "entropy": true
-  },
-  {
-    "regex": "(?i)\\\"(?:password|pass|pwd|secret|api[_-]?key|apikey|auth[_-]?token|client[_-]?secret|db[_-]?password)\\\"\\s*:\\s*\\\"([^\\\"]{4,})\\\"",
-    "entropy": true
-  },
-  {
-    "regex": "\\b(?:api[_-]?token|token|apikey|id|key)\\s*[:=]\\s*(\\d{6,})\\b",
-    "entropy": false
-  },
-  {
-    "regex": "\\b(?:code|otp|pin)\\s*[:=]\\s*(\\d{4,8})\\b",
-    "entropy": false
-  },
-  {
-    "regex": "(?i)\\bdata\\s*:\\s*\\n(?:\\s+[A-Za-z0-9_\\-]+\\s*:\\s*[A-Za-z0-9+/=]{8,}\\n)+",
-    "entropy": true
+    "pattern": "(?i)token\\s*[:=]\\s*['\"][^'\"]+['\"]",
+    "entropy": true,
+    "severity": "HIGH"
   }
 ]
