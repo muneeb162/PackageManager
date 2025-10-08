@@ -35,7 +35,6 @@ jobs:
           # Generate JSON report
           trufflehog git \
             --json \
-            --only-verified \
             --branch $CURRENT_BRANCH \
             https://github.com/${{ github.repository }}.git \
             > trufflehog_report.json || true
