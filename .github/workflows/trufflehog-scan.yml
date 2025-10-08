@@ -1,69 +1,63 @@
-name: Secret Scan on PR (TruffleHog)
+name: Secret Scan on PR (trufflehog3)
 
 on:
   pull_request:
     branches:
-      - master  # or 'main' depending on your repo
+      - master  # or master, whichever is your default
 
 jobs:
-  trufflehog-scan:
-    name: Run TruffleHog v3 on PR changes
+  trufflehog3-scan:
+    name: Run trufflehog3 scan
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # needed so we can compare commits
+          fetch-depth: 0
 
-      - name: Install TruffleHog v3
+      - name: Install trufflehog3
         run: |
           python3 -m pip install --upgrade pip
-          pip install trufflehog jq
+          pip install trufflehog3
 
-      - name: Run TruffleHog scan on PR diff
-        id: trufflehog
+      - name: Run trufflehog3 and generate reports
+        id: scan
         run: |
-          echo "🔍 Running TruffleHog scan on PR changes..."
+          echo "🔍 Running trufflehog3 secret scan..."
+          BASE=${{ github.base_ref }}
+          HEAD=${{ github.head_ref }}
 
-          BASE_BRANCH=${{ github.base_ref }}
-          HEAD_BRANCH=${{ github.head_ref }}
-
-          echo "Comparing origin/$BASE_BRANCH...$HEAD_BRANCH"
-
-          git fetch origin $BASE_BRANCH
-          git fetch origin $HEAD_BRANCH
-
-          BASE_COMMIT=$(git merge-base origin/$BASE_BRANCH origin/$HEAD_BRANCH)
+          # Identify merge-base commit to scan diff
+          git fetch origin $BASE
+          git fetch origin $HEAD
+          BASE_COMMIT=$(git merge-base origin/$BASE origin/$HEAD)
           echo "Base commit: $BASE_COMMIT"
 
-          # ✅ Correct syntax — local repo path instead of GitHub URL
-          trufflehog git . \
-            --since-commit $BASE_COMMIT \
-            --branch $HEAD_BRANCH \
-            --json > trufflehog_report.json || true
+          # Run scan
+          trufflehog3 scan \
+            --since-commit "$BASE_COMMIT" \
+            --format json \
+            --output trufflehog_report.json
 
-          # 🧾 Generate human-friendly HTML report
-          echo "<html><head><title>TruffleHog Report</title>
-          <style>
-            body { font-family: Arial, sans-serif; margin: 20px; }
-            h1 { color: #444; }
-            pre { background: #f4f4f4; padding: 10px; border-radius: 8px; }
-          </style></head><body><h1>🔐 TruffleHog Secrets Scan Report</h1><pre>" > trufflehog_report.html
-          cat trufflehog_report.json | jq . >> trufflehog_report.html
-          echo "</pre></body></html>" >> trufflehog_report.html
+          # Also generate HTML from that JSON
+          trufflehog3 render \
+            -R trufflehog_report.json \
+            --output trufflehog_report.html
 
-          # ❌ Fail workflow if secrets found
+      - name: Fail on secrets found
+        if: steps.scan.outcome == 'success'
+        run: |
           if grep -q '"SourceMetadata"' trufflehog_report.json; then
-            echo "::error::⚠️ Secrets found in PR! Check trufflehog_report.html"
+            echo "::error::⚠️ Secrets found in this PR. See report."
             exit 1
           else
-            echo "✅ No secrets found!"
+            echo "✅ No secrets found."
           fi
 
-      - name: Upload TruffleHog HTML Report
+      - name: Upload HTML report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: trufflehog-html-report
+          name: trufflehog3-html-report
           path: trufflehog_report.html
