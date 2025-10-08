@@ -3,7 +3,7 @@ name: Secret Scan on PR (TruffleHog)
 on:
   pull_request:
     branches:
-      - main
+      - master
 
 jobs:
   trufflehog-scan:
