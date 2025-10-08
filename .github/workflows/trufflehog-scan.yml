@@ -3,11 +3,11 @@ name: Secret Scan on PR (trufflehog3)
 on:
   pull_request:
     branches:
-      - master  # or master, whichever is your default
+      - master  # or main, whichever is your default
 
 jobs:
   trufflehog3-scan:
-    name: Run trufflehog3 scan
+    name: Run trufflehog3 secret scan
     runs-on: ubuntu-latest
 
     steps:
@@ -20,39 +20,44 @@ jobs:
         run: |
           python3 -m pip install --upgrade pip
           pip install trufflehog3
+          trufflehog3 --version
 
-      - name: Run trufflehog3 and generate reports
+      - name: Run trufflehog3 scan
         id: scan
         run: |
-          echo "🔍 Running trufflehog3 secret scan..."
-          BASE=${{ github.base_ref }}
-          HEAD=${{ github.head_ref }}
+          echo "🔍 Running trufflehog3 secret scan on PR changes..."
 
-          # Identify merge-base commit to scan diff
-          git fetch origin $BASE
-          git fetch origin $HEAD
-          BASE_COMMIT=$(git merge-base origin/$BASE origin/$HEAD)
+          BASE_BRANCH="${{ github.base_ref }}"
+          HEAD_BRANCH="${{ github.head_ref }}"
+          echo "Comparing ${BASE_BRANCH}...${HEAD_BRANCH}"
+
+          git fetch origin $BASE_BRANCH
+          git fetch origin $HEAD_BRANCH
+          BASE_COMMIT=$(git merge-base origin/$BASE_BRANCH origin/$HEAD_BRANCH)
           echo "Base commit: $BASE_COMMIT"
 
-          # Run scan
+          mkdir reports
+
+          # Run trufflehog3 scan (correct syntax)
           trufflehog3 scan \
             --since-commit "$BASE_COMMIT" \
             --format json \
-            --output trufflehog_report.json
+            --output reports/trufflehog_report.json \
+            .
 
-          # Also generate HTML from that JSON
+          # Generate pretty HTML report
           trufflehog3 render \
-            -R trufflehog_report.json \
-            --output trufflehog_report.html
+            -R reports/trufflehog_report.json \
+            --format html \
+            --output reports/trufflehog_report.html
 
-      - name: Fail on secrets found
-        if: steps.scan.outcome == 'success'
+      - name: Fail if secrets found
         run: |
-          if grep -q '"SourceMetadata"' trufflehog_report.json; then
-            echo "::error::⚠️ Secrets found in this PR. See report."
+          if grep -q '"DetectorName"' reports/trufflehog_report.json; then
+            echo "::error::⚠️ Secrets detected! Check trufflehog_report.html for details."
             exit 1
           else
-            echo "✅ No secrets found."
+            echo "✅ No secrets found!"
           fi
 
       - name: Upload HTML report
@@ -60,4 +65,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: trufflehog3-html-report
-          path: trufflehog_report.html
+          path: reports/trufflehog_report.html
