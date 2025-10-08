@@ -1,0 +1,117 @@
+[
+  {
+    "name": "Assignment — generic secret (quoted)",
+    "regex": "(?i)\\b(?:password|pass|pwd|secret|secr|token|api[_-]?key|apikey|auth[_-]?token|access[_-]?token|client[_-]?secret|consumer[_-]?secret|private[_-]?key|privatekey|ssh[_-]?key|db[_-]?password|dbpass|mongo[_-]?uri|mongo[_-]?url|connection[_-]?string)\\s*[:=]\\s*['\\\"]([^'\\\"]{8,})['\\\"]",
+    "entropy": true
+  },
+  {
+    "name": "Assignment — generic secret (unquoted)",
+    "regex": "(?i)\\b(?:password|pass|pwd|secret|token|api[_-]?key|apikey|auth[_-]?token|access[_-]?token|client[_-]?secret|private[_-]?key|dbpass|mongo[_-]?uri|mongo[_-]?url|connection[_-]?string)\\s*[:=]\\s*([^\\s#;]{8,})",
+    "entropy": true
+  },
+  {
+    "name": "Function argument — password/token",
+    "regex": "(?i)\\b\\w+\\s*\\([^\\)]*\\b(?:password|pass|pwd|token|api[_-]?token|secret|apikey|client[_-]?secret)\\s*=\\s*['\\\"]([^'\\\"]{6,})['\\\"][^\\)]*\\)",
+    "entropy": true
+  },
+  {
+    "name": "Key-like names in env / dotfile (KEY=VALUE)",
+    "regex": "(?m)(?i)^(?:\\s*)(?:PASSWORD|PASS|PWD|SECRET|API_KEY|API-KEY|APIKEY|AUTH_TOKEN|ACCESS_TOKEN|CLIENT_SECRET|DB_PASSWORD|DB_PASS|MONGO_URI|MONGO_URL|CONNECTION_STRING)\\s*=\\s*([^\\n\\r]{6,})",
+    "entropy": true
+  },
+  {
+    "name": "URL containing credentials (user:pass@host)",
+    "regex": "(?i)\\bhttps?://[^\\s/:]+:[^\\s/@]+@[^\\s/]+",
+    "entropy": false
+  },
+  {
+    "name": "Connection string (DB) with embedded user/pass",
+    "regex": "(?i)(?:jdbc:|mongodb(?:\\+srv)?:|postgres(?:ql)?://|redis://)[^\\n\\r]{6,}",
+    "entropy": false
+  },
+  {
+    "name": "Base64-like long string (possible token/secret)",
+    "regex": "\\b([A-Za-z0-9+/]{40,}={0,2})\\b",
+    "entropy": true
+  },
+  {
+    "name": "Hex-like long secret",
+    "regex": "\\b([0-9a-fA-F]{32,})\\b",
+    "entropy": true
+  },
+  {
+    "name": "JWT / Bearer token",
+    "regex": "\\b([A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+)\\b|Bearer\\s+[A-Za-z0-9\\-._~+/]+=*",
+    "entropy": true
+  },
+  {
+    "name": "AWS access key id",
+    "regex": "\\bAKIA[0-9A-Z]{16}\\b",
+    "entropy": true
+  },
+  {
+    "name": "AWS secret access key (looks like base64)",
+    "regex": "(?i)aws[_-]?secret[_-]?access[_-]?key\\s*[:=]\\s*([A-Za-z0-9/+=]{24,})",
+    "entropy": true
+  },
+  {
+    "name": "OAuth bearer/token header or assignment",
+    "regex": "(?i)(Authorization\\s*:\\s*Bearer\\s+[A-Za-z0-9\\-._~+/]+=*|authorization\\s*=\\s*['\\\"][A-Za-z0-9\\-._~+/]+=*['\\\"])",
+    "entropy": true
+  },
+  {
+    "name": "PEM private key block",
+    "regex": "-----BEGIN (?:RSA |EC |DSA )?PRIVATE KEY-----[\\s\\S]{20,}-----END (?:RSA |EC |DSA )?PRIVATE KEY-----",
+    "entropy": false
+  },
+  {
+    "name": "SSH private key block",
+    "regex": "-----BEGIN OPENSSH PRIVATE KEY-----[\\s\\S]{20,}-----END OPENSSH PRIVATE KEY-----",
+    "entropy": false
+  },
+  {
+    "name": "PGP private key block",
+    "regex": "-----BEGIN PGP PRIVATE KEY BLOCK-----[\\s\\S]{20,}-----END PGP PRIVATE KEY BLOCK-----",
+    "entropy": false
+  },
+  {
+    "name": "UUIDs used as tokens (long sequence)",
+    "regex": "\\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\b",
+    "entropy": true
+  },
+  {
+    "name": "Generic token-like key (short keys often used)",
+    "regex": "(?i)\\b(token|api[_-]?key|apikey|auth|secret)\\b\\s*[:=]\\s*['\\\"]?([A-Za-z0-9\\-_\\.\\=]{6,})['\\\"]?",
+    "entropy": true
+  },
+  {
+    "name": "High-entropy string (catch-all, length >= 20)",
+    "regex": "\\b([A-Za-z0-9+/=]{20,})\\b",
+    "entropy": true
+  },
+  {
+    "name": "Password-like words followed by short secret",
+    "regex": "(?i)\\b(password|pwd|pass|secret)\\b\\s*[:=]\\s*['\\\"]?([^'\\\"\\s]{4,})['\\\"]?",
+    "entropy": true
+  },
+  {
+    "name": "Environment style JSON keys with secrets",
+    "regex": "(?i)\\\"(?:password|pass|pwd|secret|api[_-]?key|apikey|auth[_-]?token|client[_-]?secret|db[_-]?password)\\\"\\s*:\\s*\\\"([^\\\"]{4,})\\\"",
+    "entropy": true
+  },
+  {
+    "name": "Generic numeric API token (digits only, >6)",
+    "regex": "\\b(?:api[_-]?token|token|apikey|id|key)\\s*[:=]\\s*(\\d{6,})\\b",
+    "entropy": false
+  },
+  {
+    "name": "Possible OTP/one-time codes (short numeric) — flaggable for review",
+    "regex": "\\b(?:code|otp|pin)\\s*[:=]\\s*(\\d{4,8})\\b",
+    "entropy": false
+  },
+  {
+    "name": "Kubernetes secret manifest base64 data",
+    "regex": "(?i)\\bdata\\s*:\\s*\\n(?:\\s+[A-Za-z0-9_\\-]+\\s*:\\s*[A-Za-z0-9+/=]{8,}\\n)+",
+    "entropy": true
+  }
+]
