@@ -35,6 +35,7 @@ jobs:
 
       - name: Run trufflehog3 scan
         run: |
+              rm backend/node_modules
               trufflehog3 --zero --no-entropy --no-history --rules rules.yml --format JSON -o trufflehog_reports/report.json .          
               trufflehog3 -R trufflehog_reports/report.json --output trufflehog_reports/report.html
 
