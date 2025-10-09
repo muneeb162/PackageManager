@@ -1,70 +1,83 @@
-name: Secret Scan (TruffleHog3)
+name: Secret Scan (TruffleHog3 - PR Changes Only)
 
 on:
   pull_request:
     branches: [ main, master ]
 
-permissions: 
-  contents: read 
-  id-token: write 
-  issues: write 
-  pull-requests: write 
-  
+permissions:
+  contents: read
+  id-token: write
+  issues: write
+  pull-requests: write
+
 jobs:
   trufflehog_scan:
-    name: Scan and Generate HTML Report
+    name: Scan Only Changed Files with TruffleHog3
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 
+          fetch-depth: 0  # full history so git diff works
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.x'
 
-      - name: Install Python Report Generator (trufflehog3)
+      - name: Install TruffleHog3
         run: pip install trufflehog3
 
-      - name: Get changed files in PR
-        id: changed_files
+      - name: Fetch base branch for diff
         run: |
           git fetch origin ${{ github.event.pull_request.base.ref }}
-          git diff --name-only origin/${{ github.event.pull_request.base.ref }} > changed_files.txt
+
+      - name: Get changed files in PR
+        id: changes
+        run: |
+          git diff --name-only --diff-filter=AM origin/${{ github.event.pull_request.base.ref }}...HEAD > changed_files.txt
+          echo "Changed files:"
           cat changed_files.txt
+          echo "files=$(cat changed_files.txt | xargs)" >> $GITHUB_OUTPUT
 
-      # - name: Create Artifact Directory
-      #   run: mkdir -p trufflehog_reports
-
-      - name: Run TruffleHog3 scan only on changed files
+      - name: Run TruffleHog3 scan on changed files
         run: |
           mkdir -p trufflehog_reports
-          xargs -a changed_files.txt -I {} bash -c 'if [ -f "{}" ]; then trufflehog3 --zero --no-entropy --no-history --rules rules.yml --format JSON -o trufflehog_reports/$(basename {}).json {}; fi'
-          trufflehog3 -R trufflehog_reports/ --output trufflehog_reports/report.html
+          if [ ! -s changed_files.txt ]; then
+            echo "✅ No changed files detected. Skipping scan."
+            exit 0
+          fi
 
-      # - name: Run trufflehog3 scan
-      #   run: |
-      #         rm -rf backend/node_modules
-      #         trufflehog3 --zero --no-entropy --no-history --rules rules.yml --format JSON -o trufflehog_reports/report.json .          
-      #         trufflehog3 -R trufflehog_reports/report.json --output trufflehog_reports/report.html
+          while IFS= read -r file; do
+            if [ -f "$file" ]; then
+              echo "🔍 Scanning $file..."
+              trufflehog3 --zero --no-entropy --no-history \
+                --rules rules.yml \
+                --format JSON \
+                -o trufflehog_reports/$(basename "$file").json \
+                "$file"
+            fi
+          done < changed_files.txt
 
-      # - name: Generate HTML Report from JSON
-      #   run: |
-      #     trufflehog3 -R trufflehog_reports/report.json --output trufflehog_reports/report.html
+          # Merge all small JSONs into one (simple concatenation)
+          jq -s '.' trufflehog_reports/*.json > trufflehog_reports/report.json
 
-      - name: Upload HTML Report Artifact
+      - name: Generate HTML Report
+        run: |
+          trufflehog3 -R trufflehog_reports/report.json --output trufflehog_reports/report.html
+
+      - name: Upload HTML Report
         uses: actions/upload-artifact@v4
         with:
-          name: TruffleHog-v3-HTML-Report
+          name: TruffleHog3-HTML-Report
           path: trufflehog_reports/report.html
           retention-days: 7
 
       - name: Upload Raw JSON Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: TruffleHog-v3-Raw-JSON
+          name: TruffleHog3-Raw-JSON
           path: trufflehog_reports/report.json
 
       - name: Fail if secrets found
