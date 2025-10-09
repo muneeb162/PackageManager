@@ -32,21 +32,27 @@ jobs:
       - name: Create Artifact Directory
         run: mkdir -p trufflehog_reports
 
-      - name: Run trufflehog3 scan
-        run: |
-              find . -type f \
-                ! -path "./node_modules/*" \
-                ! -path "./trufflehog_reports/*" \
-                ! -path "./rules.yml" \
-                ! -path "./.git/*" \
-              | trufflehog3 --zero --no-entropy --no-history \
-                --rules rules.yml \
-                --format JSON -o trufflehog_reports/report.json -          
-              trufflehog3 -R trufflehog_reports/report.json --output trufflehog_reports/report.html
-
-      # - name: Generate HTML Report from JSON
+      # - name: Run trufflehog3 scan
       #   run: |
-      #     trufflehog3 -R trufflehog_reports/report.json --output trufflehog_reports/report.html
+      #         trufflehog3 --zero --no-entropy --no-history --rules rules.yml  --format JSON -o trufflehog_reports/report.json .          
+      #         trufflehog3 -R trufflehog_reports/report.json --output trufflehog_reports/report.html
+
+      - name: Run TruffleHog3 scan (filtered)
+        shell: bash
+        run: |
+          set +o pipefail
+          find . -type f \
+            ! -path "./node_modules/*" \
+            ! -path "./trufflehog_reports/*" \
+            ! -path "./rules.yml" \
+            ! -path "./.git/*" \
+          | trufflehog3 --zero --no-entropy --no-history \
+              --rules rules.yml \
+              --format JSON -o trufflehog_reports/report.json --stdin
+
+      - name: Generate HTML Report from JSON
+        run: |
+          trufflehog3 -R trufflehog_reports/report.json --output trufflehog_reports/report.html
           
       - name: Upload HTML Report Artifact
         uses: actions/upload-artifact@v4
