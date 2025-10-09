@@ -1,9 +1,10 @@
-name: TruffleHog V3 Report
+name: Secret Scan (TruffleHog3)
 
 on:
+  push:
+    branches: [ main, master ]
   pull_request:
-    branches:
-      - master
+    branches: [ main, master ]
 
 permissions: 
   contents: read 
@@ -34,8 +35,7 @@ jobs:
 
       - name: Run trufflehog3 scan
         run: |
-              pwd
-              trufflehog3 --zero --no-entropy --no-history --rules rules.yml  --format JSON -o trufflehog_reports/report.json .          
+              trufflehog3 --zero --no-entropy --no-history --rules rules.yml  --skip-paths "rules.yml|trufflehog_reports/|node_modules/|.git/" --format JSON -o trufflehog_reports/report.json .          
               trufflehog3 -R trufflehog_reports/report.json --output trufflehog_reports/report.html
 
       # - name: Generate HTML Report from JSON
