@@ -34,7 +34,7 @@ jobs:
 
       - name: Run trufflehog3 scan
         run: |
-          trufflehog3 --zero --rules rules.yml --no-history --format JSON -o trufflehog_reports/report.json .
+          trufflehog3 --zero --no-history --format JSON -o trufflehog_reports/report.json .
           trufflehog3 -R trufflehog_reports/report.json --output trufflehog_reports/report.html
 
       # - name: Generate HTML Report from JSON
