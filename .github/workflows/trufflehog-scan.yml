@@ -49,9 +49,10 @@ jobs:
             ! -path "./node_modules/*" \
             ! -path "./trufflehog_reports/*" \
             ! -path "./.git/*" \
-            ! -path "./rules.yml" \
-            -print0 | xargs -0 trufflehog3 --zero --no-entropy --no-history --rules rules.yml --format JSON -o trufflehog_reports/report.json
+            ! -name "rules.yml" \
+          -print0 | xargs -0 trufflehog3 --zero --no-entropy --no-history --rules rules.yml --format JSON -o trufflehog_reports/report.json
           trufflehog3 -R trufflehog_reports/report.json --output trufflehog_reports/report.html
+
 
       - name: Upload HTML Report Artifact
         uses: actions/upload-artifact@v4
