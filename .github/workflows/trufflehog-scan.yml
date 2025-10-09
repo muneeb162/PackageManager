@@ -64,7 +64,7 @@ jobs:
           done < changed_files.txt
 
           # Merge all small JSONs into one (simple concatenation)
-          jq -s '.' trufflehog_reports/*.json > trufflehog_reports/report.json
+          jq -s 'add' trufflehog_reports/*.json > trufflehog_reports/report.json
 
       - name: Generate HTML Report
         run: |
