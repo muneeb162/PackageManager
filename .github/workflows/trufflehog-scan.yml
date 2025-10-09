@@ -1,8 +1,6 @@
 name: Secret Scan (TruffleHog3)
 
 on:
-  push:
-    branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
 
@@ -30,14 +28,27 @@ jobs:
       - name: Install Python Report Generator (trufflehog3)
         run: pip install trufflehog3
 
-      - name: Create Artifact Directory
-        run: mkdir -p trufflehog_reports
-
-      - name: Run trufflehog3 scan
+      - name: Get changed files in PR
+        id: changed_files
         run: |
-              rm -rf backend/node_modules
-              trufflehog3 --zero --no-entropy --no-history --rules rules.yml --format JSON -o trufflehog_reports/report.json .          
-              trufflehog3 -R trufflehog_reports/report.json --output trufflehog_reports/report.html
+          git fetch origin ${{ github.event.pull_request.base.ref }}
+          git diff --name-only origin/${{ github.event.pull_request.base.ref }} > changed_files.txt
+          cat changed_files.txt
+
+      # - name: Create Artifact Directory
+      #   run: mkdir -p trufflehog_reports
+
+      - name: Run TruffleHog3 scan only on changed files
+        run: |
+          mkdir -p trufflehog_reports
+          xargs -a changed_files.txt -I {} bash -c 'if [ -f "{}" ]; then trufflehog3 --zero --no-entropy --no-history --rules rules.yml --format JSON -o trufflehog_reports/$(basename {}).json {}; fi'
+          trufflehog3 -R trufflehog_reports/ --output trufflehog_reports/report.html
+
+      # - name: Run trufflehog3 scan
+      #   run: |
+      #         rm -rf backend/node_modules
+      #         trufflehog3 --zero --no-entropy --no-history --rules rules.yml --format JSON -o trufflehog_reports/report.json .          
+      #         trufflehog3 -R trufflehog_reports/report.json --output trufflehog_reports/report.html
 
       # - name: Generate HTML Report from JSON
       #   run: |
