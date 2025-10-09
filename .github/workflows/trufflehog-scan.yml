@@ -33,26 +33,14 @@ jobs:
       - name: Create Artifact Directory
         run: mkdir -p trufflehog_reports
 
-      # - name: Run trufflehog3 scan
-      #   run: |
-      #         trufflehog3 --zero --no-entropy --no-history --rules rules.yml --format JSON -o trufflehog_reports/report.json .          
-      #         trufflehog3 -R trufflehog_reports/report.json --output trufflehog_reports/report.html
+      - name: Run trufflehog3 scan
+        run: |
+              trufflehog3 --zero --no-entropy --no-history --rules rules.yml --format JSON -o trufflehog_reports/report.json .          
+              trufflehog3 -R trufflehog_reports/report.json --output trufflehog_reports/report.html
 
       # - name: Generate HTML Report from JSON
       #   run: |
       #     trufflehog3 -R trufflehog_reports/report.json --output trufflehog_reports/report.html
-
-      - name: Run TruffleHog3 scan
-        run: |
-          mkdir -p trufflehog_reports
-          find . -type f \
-            ! -path "./node_modules/*" \
-            ! -path "./trufflehog_reports/*" \
-            ! -path "./.git/*" \
-            ! -name "rules.yml" \
-          -print0 | xargs -0 trufflehog3 --zero --no-entropy --no-history --rules rules.yml --format JSON -o trufflehog_reports/report.json
-          trufflehog3 -R trufflehog_reports/report.json --output trufflehog_reports/report.html
-
 
       - name: Upload HTML Report Artifact
         uses: actions/upload-artifact@v4
