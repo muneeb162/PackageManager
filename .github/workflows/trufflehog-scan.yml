@@ -52,11 +52,14 @@ jobs:
           while IFS= read -r file; do
             if [ -f "$file" ]; then
               echo "🔍 Scanning $file..."
+              mkdir -p temp_scan
+              cp "$file" temp_scan/
               trufflehog3 --zero --no-entropy --no-history \
                 --rules rules.yml \
                 --format JSON \
                 -o trufflehog_reports/$(basename "$file").json \
-                "$file"
+                temp_scan/
+              rm -rf temp_scan
             fi
           done < changed_files.txt
 
