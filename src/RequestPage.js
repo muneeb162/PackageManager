@@ -3,6 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/Card";
 import { BarChart, Inbox, Calendar, Users, Settings, Sun, Moon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from './ThemeContext';
+import axios from 'axios';
+
 
 const RequestPage = () => {
     const navigate = useNavigate();
@@ -197,14 +199,38 @@ const RequestPage = () => {
     setFormData({});
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Form submitted:', {
+  
+    const requestData = {
       project: selectedProject,
       requestType,
       selectedTypes,
-      formData
-    });
+      formData,
+    };
+  
+    try {
+      // Sending POST request to the backend API
+      const response = await axios.post('https://your-backend-api.com/endpoint', requestData, {
+        headers: {
+          'Content-Type': 'application/json',  // Make sure the content type is JSON
+        },
+      });
+  
+      // Handle success (e.g., show a success message)
+      console.log('Form submitted successfully:', response.data);
+      
+      // Optionally, reset the form or navigate to another page
+      setSelectedProject('');
+      setRequestType('');
+      setSelectedTypes([]);
+      setFormData({});
+      navigate('/dashboard'); // Redirect to a success page, for example
+    } catch (error) {
+      // Handle error (e.g., show an error message)
+      console.error('Error submitting form:', error);
+      alert('There was an error submitting your request. Please try again.');
+    }
   };
 
    // Theme-based style classes

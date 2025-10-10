@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/Card";
 import { Package, Lock, EyeOff, Eye } from 'lucide-react';
 import { useTheme } from './ThemeContext';
+import axios from 'axios';
+
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -46,14 +48,23 @@ const LoginPage = () => {
     setError('');
 
     try {
-      // Here you would typically make an API call to authenticate
-      // For demonstration, we'll simulate an API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Make a POST request to your backend server for authentication
+      const response = await axios.post('https://your-backend-api.com/login', {
+        email: formData.email,
+        password: formData.password,
+      });
 
-      // If authentication is successful, navigate to dashboard
-      navigate('/dashboard');
+      // Check if login is successful
+      if (response.data.success) {
+        // If successful, redirect to the dashboard
+        navigate('/dashboard');
+      } else {
+        // If failed, set error message
+        setError('Invalid email or password');
+      }
     } catch (err) {
-      setError('Invalid email or password');
+      // Handle any errors from the request
+      setError('An error occurred. Please try again.');
     } finally {
       setLoading(false);
     }
