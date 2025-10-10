@@ -29,6 +29,15 @@ jobs:
       - name: Install TruffleHog3
         run: pip install trufflehog3
 
+      # Scan Complete Repo
+      # - name: Create Artifact Directory
+      #   run: mkdir -p trufflehog_reports
+
+      # - name: Run trufflehog3 scan
+      #   run: |
+      #         trufflehog3 --zero --no-entropy --no-history --rules rules.yml --format JSON -o trufflehog_reports/report.json .          
+      #         trufflehog3 -R trufflehog_reports/report.json --output trufflehog_reports/report.html
+
       - name: Fetch base branch for diff
         run: |
           git fetch origin ${{ github.event.pull_request.base.ref }}
