@@ -1,8 +1,7 @@
 name: Pull → Push → Update Docker Hub Description
 
 on:
-  workflow_dispatch:   # Run manually for testing
-  push:
+  pull_request:
     branches: [ main, master ]
 
 jobs:
