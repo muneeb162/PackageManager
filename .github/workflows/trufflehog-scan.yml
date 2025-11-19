@@ -1,102 +1,45 @@
-name: Secret Scan (TruffleHog3 - PR Changes Only)
+name: Pull → Push → Update Docker Hub Description
 
 on:
-  pull_request:
+  workflow_dispatch:   # Run manually for testing
+  push:
     branches: [ main, master ]
 
-permissions:
-  contents: read
-  id-token: write
-  issues: write
-  pull-requests: write
-
 jobs:
-  trufflehog_scan:
-    name: Scan Only Changed Files with TruffleHog3
+  push-nginx:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      # 1. Checkout repository (for README.md)
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      # 2. Login to Docker Hub
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
         with:
-          fetch-depth: 0  # full history so git diff works
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      # 3. Pull nginx image
+      - name: Pull nginx image
+        run: docker pull nginx:latest
+
+      # 4. Retag for your private repo
+      - name: Tag image for private repo
+        run: |
+          docker tag nginx:latest devoptps/nginx-test:latest
+
+      # 5. Push to private repo
+      - name: Push image
+        run: |
+          docker push devoptps/nginx-test:latest
+
+      # 6. Update Docker Hub description using README.md
+      - name: Update Docker Hub description
+        uses: peter-evans/dockerhub-description@v3
         with:
-          python-version: '3.x'
-
-      - name: Install TruffleHog3
-        run: pip install trufflehog3
-
-      # Scan Complete Repo
-      # - name: Create Artifact Directory
-      #   run: mkdir -p trufflehog_reports
-
-      # - name: Run trufflehog3 scan
-      #   run: |
-      #         trufflehog3 --zero --no-entropy --no-history --rules rules.yml --format JSON -o trufflehog_reports/report.json .          
-      #         trufflehog3 -R trufflehog_reports/report.json --output trufflehog_reports/report.html
-
-      - name: Fetch base branch for diff
-        run: |
-          git fetch origin ${{ github.event.pull_request.base.ref }}
-
-      - name: Get changed files in PR
-        id: changes
-        run: |
-          git diff --name-only --diff-filter=AM origin/${{ github.event.pull_request.base.ref }}...HEAD > changed_files.txt
-          echo "Changed files:"
-          cat changed_files.txt
-          echo "files=$(cat changed_files.txt | xargs)" >> $GITHUB_OUTPUT
-
-      - name: Run TruffleHog3 scan on changed files
-        run: |
-          mkdir -p trufflehog_reports
-          if [ ! -s changed_files.txt ]; then
-            echo "✅ No changed files detected. Skipping scan."
-            exit 0
-          fi
-
-          while IFS= read -r file; do
-            if [ -f "$file" ]; then
-              echo "🔍 Scanning $file..."
-              mkdir -p temp_scan
-              cp "$file" temp_scan/
-              trufflehog3 --zero --no-entropy --no-history \
-                --rules rules.yml \
-                --format JSON \
-                -o trufflehog_reports/$(basename "$file").json \
-                temp_scan/
-              rm -rf temp_scan
-            fi
-          done < changed_files.txt
-
-          # Merge all small JSONs into one (simple concatenation)
-          jq -s 'add' trufflehog_reports/*.json > trufflehog_reports/report.json
-
-      - name: Generate HTML Report
-        run: |
-          trufflehog3 -R trufflehog_reports/report.json --output trufflehog_reports/report.html
-
-      - name: Upload HTML Report
-        uses: actions/upload-artifact@v4
-        with:
-          name: TruffleHog3-HTML-Report
-          path: trufflehog_reports/report.html
-          retention-days: 7
-
-      - name: Upload Raw JSON Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: TruffleHog3-Raw-JSON
-          path: trufflehog_reports/report.json
-
-      - name: Fail if secrets found
-        run: |
-          if grep -q '"severity":' trufflehog_reports/report.json; then
-            echo "❌ Potential secrets detected! Check trufflehog_reports/report.json"
-            exit 1
-          else
-            echo "✅ No secrets found."
-          fi
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: devoptps/nginx-test
+          readme-filepath: ./README.md
