@@ -27,12 +27,12 @@ jobs:
       # 4. Retag for your private repo
       - name: Tag image for private repo
         run: |
-          docker tag nginx:latest devoptps/nginx-test:latest
+          docker tag nginx:latest devopstps/nginx-test:latest
 
       # 5. Push to private repo
       - name: Push image
         run: |
-          docker push devoptps/nginx-test:latest
+          docker push devopstps/nginx-test:latest
 
       # 6. Update Docker Hub description using README.md
       - name: Update Docker Hub description
@@ -40,5 +40,5 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-          repository: devoptps/nginx-test
+          repository: devopstps/nginx-test
           readme-filepath: ./README.md
