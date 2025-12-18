@@ -111,3 +111,58 @@ jobs:
         run: |
           docker stop migration-db
           docker rm migration-db
+
+      - name: DB Migration Validation Summary
+        id: db_migration
+        run: |
+          set -e
+          SUCCESSFUL=()
+          FAILED=()
+          
+          echo "## 🗄️ Database Migration Validation" >> $GITHUB_STEP_SUMMARY
+          echo "**Service:** ${{ github.event.inputs.service }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Tag:** ${{ github.event.inputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Validation Time:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+      
+          for file in $(ls db/migrations/*.sql | sort); do
+            echo "▶ Running $file"
+            if docker exec -i migration-db psql -U testuser -d testdb -v ON_ERROR_STOP=1 < "$file"; then
+              echo "✅ Success: $file"
+              SUCCESSFUL+=("$file")
+            else
+              echo "❌ Failed: $file"
+              FAILED+=("$file")
+            fi
+            echo "" >> $GITHUB_STEP_SUMMARY
+          done
+      
+          echo "--------------------------------------------------" >> $GITHUB_STEP_SUMMARY
+      
+          # Show summary
+          echo "### ✅ Successful Migrations" >> $GITHUB_STEP_SUMMARY
+          if [ ${#SUCCESSFUL[@]} -eq 0 ]; then
+            echo "None" >> $GITHUB_STEP_SUMMARY
+          else
+            for s in "${SUCCESSFUL[@]}"; do
+              echo "- $s" >> $GITHUB_STEP_SUMMARY
+            done
+          fi
+      
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ❌ Failed Migrations" >> $GITHUB_STEP_SUMMARY
+          if [ ${#FAILED[@]} -eq 0 ]; then
+            echo "None" >> $GITHUB_STEP_SUMMARY
+          else
+            for f in "${FAILED[@]}"; do
+              echo "- $f" >> $GITHUB_STEP_SUMMARY
+            done
+          fi
+      
+          # Set output for next jobs
+          if [ ${#FAILED[@]} -gt 0 ]; then
+            echo "migration_failed=true" >> $GITHUB_OUTPUT
+          else
+            echo "migration_failed=false" >> $GITHUB_OUTPUT
+          fi
+
