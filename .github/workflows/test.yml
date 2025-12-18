@@ -38,7 +38,7 @@ jobs:
             -e POSTGRES_PASSWORD=testpass \
             -e POSTGRES_DB=testdb \
             -p 5432:5432 \
-            postgres:15
+            postgres:17
 
       # 5️⃣ Wait for DB readiness
       - name: Wait for DB readiness
