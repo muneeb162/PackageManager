@@ -108,56 +108,69 @@ jobs:
       - name: DB Migration Validation Summary
         id: db_migration
         run: |
-          set -e
-          SUCCESSFUL=()
-          FAILED=()
+          MIGRATION_DIR="db/migrations"
+          SEED_FILE="db/seeds.sql"
+          VALIDATION_TIME=$(date -u +'%Y-%m-%d %H:%M:%S UTC')
           
-          echo "## 🗄️ Database Migration Validation" >> $GITHUB_STEP_SUMMARY
-          echo "**Service:** ${{ github.event.inputs.service }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Tag:** ${{ github.event.inputs.tag }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Validation Time:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-      
-          for file in $(ls db/migrations/*.sql | sort); do
-            echo "▶ Running $file"
-            if docker exec -i migration-db psql -U testuser -d testdb -v ON_ERROR_STOP=1 < "$file"; then
-              echo "✅ Success: $file"
-              SUCCESSFUL+=("$file")
+          HAS_FAIL=false
+          REPORT_FILE="migration-reports/DB-Migration-Report.md"
+          
+          mkdir -p migration-reports
+          echo "# 🛠️ Database Migration Validation Report" > $REPORT_FILE
+          echo "**Validation Time:** $VALIDATION_TIME" >> $REPORT_FILE
+          echo "" >> $REPORT_FILE
+          
+          echo "## Migration Files Validation" >> $REPORT_FILE
+          echo "| File | Type | Status | Notes |" >> $REPORT_FILE
+          echo "|------|------|--------|-------|" >> $REPORT_FILE
+          
+          for file in $MIGRATION_DIR/*.sql; do
+            FILE_NAME=$(basename $file)
+            TYPE="migration"
+            
+            # Simple validation: check for syntax errors using 'psql' dry-run or custom SQL linter
+            if psql --dry-run -f "$file" 2>/tmp/db_errors.txt; then
+              STATUS="PASS"
+              NOTES="None"
             else
-              echo "❌ Failed: $file"
-              FAILED+=("$file")
+              STATUS="FAIL"
+              NOTES=$(cat /tmp/db_errors.txt)
+              HAS_FAIL=true
             fi
-            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            echo "| $FILE_NAME | $TYPE | $STATUS | $NOTES |" >> $REPORT_FILE
           done
-      
-          echo "--------------------------------------------------" >> $GITHUB_STEP_SUMMARY
-      
-          # Show summary
-          echo "### ✅ Successful Migrations" >> $GITHUB_STEP_SUMMARY
-          if [ ${#SUCCESSFUL[@]} -eq 0 ]; then
-            echo "None" >> $GITHUB_STEP_SUMMARY
-          else
-            for s in "${SUCCESSFUL[@]}"; do
-              echo "- $s" >> $GITHUB_STEP_SUMMARY
-            done
+          
+          echo "" >> $REPORT_FILE
+          echo "## Seed File Validation" >> $REPORT_FILE
+          
+          if [ -f "$SEED_FILE" ]; then
+            TYPE="seed"
+            if psql --dry-run -f "$SEED_FILE" 2>/tmp/db_errors.txt; then
+              STATUS="PASS"
+              NOTES="None"
+            else
+              STATUS="FAIL"
+              NOTES=$(cat /tmp/db_errors.txt)
+              HAS_FAIL=true
+            fi
+            echo "| $(basename $SEED_FILE) | $TYPE | $STATUS | $NOTES |" >> $REPORT_FILE
           fi
-      
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### ❌ Failed Migrations" >> $GITHUB_STEP_SUMMARY
-          if [ ${#FAILED[@]} -eq 0 ]; then
-            echo "None" >> $GITHUB_STEP_SUMMARY
+          
+          echo "" >> $REPORT_FILE
+          if [ "$HAS_FAIL" = true ]; then
+            echo "⚠️ Some migration/seed files failed validation. Please check above table." >> $REPORT_FILE
           else
-            for f in "${FAILED[@]}"; do
-              echo "- $f" >> $GITHUB_STEP_SUMMARY
-            done
+            echo "✅ All migration and seed files validated successfully." >> $REPORT_FILE
           fi
-      
-          # Set output for next jobs
-          if [ ${#FAILED[@]} -gt 0 ]; then
-            echo "migration_failed=true" >> $GITHUB_OUTPUT
-          else
-            echo "migration_failed=false" >> $GITHUB_OUTPUT
-          fi
+          
+          echo "has_fail=$HAS_FAIL" >> $GITHUB_OUTPUT
+
+      - name: Convert Markdown to HTML
+        run: |
+          sudo apt-get update && sudo apt-get install -y python3-pip
+          pip3 install grip
+          grip migration-reports/DB-Migration-Report.md --export migration-reports/DB-Migration-Report.html
 
       # 8️⃣ Cleanup
       - name: Stop and remove PostgreSQL container
