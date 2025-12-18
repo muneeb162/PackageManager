@@ -49,42 +49,52 @@ jobs:
             sleep 3
           done
 
-      # 6️⃣ Run migrations
-      - name: Run DB migrations (with summary)
+      - name: Run DB migrations (with correct error reporting)
         if: steps.dbscripts.outputs.found == 'true'
         run: |
           set +e
-
+      
           echo "## 🗄️ Database Migrations" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Script | Status | Error |" >> $GITHUB_STEP_SUMMARY
-          echo "|--------|--------|-------|" >> $GITHUB_STEP_SUMMARY
-
+          echo "| Script | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|--------|" >> $GITHUB_STEP_SUMMARY
+      
           FAILED=0
-
+          ERROR_BLOCK=""
+      
           for file in $(ls db/migrations/*.sql 2>/dev/null | sort); do
             echo "▶ Running $file"
-
+      
             OUTPUT=$(docker exec -i migration-db \
-              psql -U testuser -d testdb -v ON_ERROR_STOP=1 < "$file" 2>&1)
-
+              psql -U testuser -d testdb \
+              -v ON_ERROR_STOP=1 \
+              -v VERBOSITY=verbose < "$file" 2>&1)
+      
             if [ $? -eq 0 ]; then
-              echo "| $file | ✅ Success | - |" >> $GITHUB_STEP_SUMMARY
+              echo "| $file | ✅ Success |" >> $GITHUB_STEP_SUMMARY
             else
               FAILED=1
-              ERROR=$(echo "$OUTPUT" | tail -n 8 | sed 's/|/\\|/g')
-              echo "| $file | ❌ Failed | \`\`\`$ERROR\`\`\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| $file | ❌ Failed |" >> $GITHUB_STEP_SUMMARY
+      
+              ERROR_BLOCK="${ERROR_BLOCK}
+              ### ❌ ${file}
+              \`\`\`
+              ${OUTPUT}
+              \`\`\`
+              "
             fi
           done
-
+      
           if [ $FAILED -ne 0 ]; then
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "❌ **One or more migration scripts failed**" >> $GITHUB_STEP_SUMMARY
+            echo "## 🔍 Error Details" >> $GITHUB_STEP_SUMMARY
+            echo "$ERROR_BLOCK" >> $GITHUB_STEP_SUMMARY
             exit 1
           else
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "✅ **All migration scripts applied successfully**" >> $GITHUB_STEP_SUMMARY
+            echo "✅ **All migration scripts executed successfully**" >> $GITHUB_STEP_SUMMARY
           fi
+
 
 
             # 7️⃣ Run DB seeds with summary
