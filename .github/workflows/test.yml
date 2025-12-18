@@ -60,14 +60,12 @@ jobs:
           echo "|--------|--------|" >> $GITHUB_STEP_SUMMARY
       
           FAILED=0
-          ERROR_BLOCK=""
+          FIRST_ERROR=1
       
           for file in $(ls db/migrations/*.sql 2>/dev/null | sort); do
             echo "▶ Running $file"
-      
             BASENAME=$(basename "$file")
       
-            # Copy SQL file into container
             docker cp "$file" migration-db:/tmp/"$BASENAME"
       
             OUTPUT=$(docker exec migration-db \
@@ -82,27 +80,32 @@ jobs:
               FAILED=1
               echo "| $file | ❌ Failed |" >> $GITHUB_STEP_SUMMARY
       
-              ERROR_BLOCK="${ERROR_BLOCK}
-              ### ❌ ${file}
-              \`\`\`
-              ${OUTPUT}
-              \`\`\`
-              "
+              # Print Error Details header only once
+              if [ $FIRST_ERROR -eq 1 ]; then
+                echo "" >> $GITHUB_STEP_SUMMARY
+                echo "## 🔍 Error Details" >> $GITHUB_STEP_SUMMARY
+                FIRST_ERROR=0
+              fi
+      
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "### ❌ $file" >> $GITHUB_STEP_SUMMARY
+              echo '```text' >> $GITHUB_STEP_SUMMARY
+              echo "$OUTPUT" >> $GITHUB_STEP_SUMMARY
+              echo '```' >> $GITHUB_STEP_SUMMARY
             fi
       
-            # Cleanup copied file
             docker exec migration-db rm -f /tmp/"$BASENAME"
           done
       
           if [ $FAILED -ne 0 ]; then
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "## 🔍 Error Details" >> $GITHUB_STEP_SUMMARY
-            echo "$ERROR_BLOCK" >> $GITHUB_STEP_SUMMARY
+            echo "❌ **One or more migration scripts failed**" >> $GITHUB_STEP_SUMMARY
             exit 1
           else
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "✅ **All migration scripts executed successfully**" >> $GITHUB_STEP_SUMMARY
           fi
+
 
 
 
