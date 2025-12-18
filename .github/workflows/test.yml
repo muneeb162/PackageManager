@@ -1,0 +1,77 @@
+name: DB Migration Validation
+
+on:
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  migration-validation:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1️⃣ Checkout code
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # 2️⃣ Set up Docker (optional, usually pre-installed on ubuntu-latest)
+      - name: Set up Docker
+        run: docker --version
+
+      # 3️⃣ Check if migration scripts exist
+      - name: Check for migration scripts
+        id: dbscripts
+        run: |
+          if [ -d "db/migrations" ] && [ "$(ls -A db/migrations/*.sql 2>/dev/null)" ]; then
+            echo "found=true" >> $GITHUB_OUTPUT
+          else
+            echo "found=false" >> $GITHUB_OUTPUT
+          fi
+
+      # 4️⃣ Start PostgreSQL container if scripts exist
+      - name: Start PostgreSQL container
+        if: steps.dbscripts.outputs.found == 'true'
+        run: |
+          docker run -d \
+            --name migration-db \
+            -e POSTGRES_USER=testuser \
+            -e POSTGRES_PASSWORD=testpass \
+            -e POSTGRES_DB=testdb \
+            -p 5432:5432 \
+            postgres:15
+
+      # 5️⃣ Wait for DB readiness
+      - name: Wait for DB readiness
+        if: steps.dbscripts.outputs.found == 'true'
+        run: |
+          until docker exec migration-db pg_isready -U testuser; do
+            echo "Waiting for PostgreSQL..."
+            sleep 3
+          done
+
+      # 6️⃣ Run migrations
+      - name: Run DB migrations
+        if: steps.dbscripts.outputs.found == 'true'
+        run: |
+          set -e
+          echo "Running migration scripts..."
+          for file in $(ls db/migrations/*.sql | sort); do
+            echo "▶ $file"
+            docker exec -i migration-db \
+              psql -U testuser -d testdb -v ON_ERROR_STOP=1 < "$file"
+          done
+
+      # 7️⃣ Run seeds (optional)
+      - name: Run DB seeds
+        if: steps.dbscripts.outputs.found == 'true' && hashFiles('db/seeds.sql') != ''
+        run: |
+          echo "Running seeds.sql"
+          docker exec -i migration-db \
+            psql -U testuser -d testdb -v ON_ERROR_STOP=1 < db/seeds.sql
+
+      # 8️⃣ Cleanup
+      - name: Stop and remove PostgreSQL container
+        if: steps.dbscripts.outputs.found == 'true'
+        run: |
+          docker stop migration-db
+          docker rm migration-db
