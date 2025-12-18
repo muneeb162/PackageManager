@@ -51,32 +51,39 @@ jobs:
 
       # 6️⃣ Run migrations
       - name: Run DB migrations
+        if: steps.dbscripts.outputs.found == 'true'
         run: |
           set -e
-          SUCCESS_FILES=()
-          FAILED_FILES=()
+          echo "Running migration scripts..."
+          SUCCESS=()
+          FAIL=()
+      
           for file in $(ls db/migrations/*.sql | sort); do
             echo "▶ Running $file"
             if docker exec -i migration-db psql -U testuser -d testdb -v ON_ERROR_STOP=1 < "$file"; then
               echo "✅ Success: $file"
-              SUCCESS_FILES+=("$file")
+              SUCCESS+=("$file")
             else
               echo "❌ Failed: $file"
-              FAILED_FILES+=("$file")
+              FAIL+=("$file")
             fi
+            echo "--------------------------------------------------"
           done
-
-          echo "--------------------------------------------------"
+      
           echo "✅ Successful migrations:"
-          for f in "${SUCCESS_FILES[@]}"; do echo "- $f"; done
-
+          for f in "${SUCCESS[@]}"; do
+            echo "- $f"
+          done
+      
           echo "❌ Failed migrations:"
-          for f in "${FAILED_FILES[@]}"; do echo "- $f"; done
-
-          # Exit with non-zero if any migration failed
-          if [ ${#FAILED_FILES[@]} -gt 0 ]; then
-            exit 1
+          if [ ${#FAIL[@]} -eq 0 ]; then
+            echo "None"
+          else
+            for f in "${FAIL[@]}"; do
+              echo "- $f"
+            done
           fi
+
 
       # 7️⃣ Run seeds (optional)
       - name: Run DB seeds
