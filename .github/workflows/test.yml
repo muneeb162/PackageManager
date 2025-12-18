@@ -1,0 +1,196 @@
+name: DB Migration Validation
+
+on:
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  migration-validation:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1️⃣ Checkout code
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # 2️⃣ Set up Docker (optional, usually pre-installed on ubuntu-latest)
+      - name: Set up Docker
+        run: docker --version
+
+      # 3️⃣ Check if migration scripts exist
+      - name: Check for migration scripts
+        id: dbscripts
+        run: |
+          if [ -d "db/migrations" ] && [ "$(ls -A db/migrations/*.sql 2>/dev/null)" ]; then
+            echo "found=true" >> $GITHUB_OUTPUT
+          else
+            echo "found=false" >> $GITHUB_OUTPUT
+          fi
+
+      # 4️⃣ Start PostgreSQL container if scripts exist
+      - name: Start PostgreSQL container
+        if: steps.dbscripts.outputs.found == 'true'
+        run: |
+          docker run -d \
+            --name migration-db \
+            -e POSTGRES_USER=testuser \
+            -e POSTGRES_PASSWORD=testpass \
+            -e POSTGRES_DB=testdb \
+            -p 5432:5432 \
+            postgres:15
+
+      # 5️⃣ Wait for DB readiness
+      - name: Wait for DB readiness
+        if: steps.dbscripts.outputs.found == 'true'
+        run: |
+          until docker exec migration-db pg_isready -U testuser; do
+            echo "Waiting for PostgreSQL..."
+            sleep 3
+          done
+      
+      # 6️⃣ Run DB migrations with summary
+      - name: Run DB migrations (proper error reporting)
+        if: steps.dbscripts.outputs.found == 'true'
+        run: |
+          set +e
+      
+          echo "## 🗄️ Database Migrations" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Script | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|--------|" >> $GITHUB_STEP_SUMMARY
+      
+          FAILED=0
+          FIRST_ERROR=1
+      
+          for file in $(ls db/migrations/*.sql 2>/dev/null | sort); do
+            echo "▶ Running $file"
+            BASENAME=$(basename "$file")
+      
+            docker cp "$file" migration-db:/tmp/"$BASENAME"
+      
+            OUTPUT=$(docker exec migration-db \
+              psql -U testuser -d testdb \
+              -v ON_ERROR_STOP=1 \
+              -v VERBOSITY=verbose \
+              -f /tmp/"$BASENAME" 2>&1)
+      
+            if [ $? -eq 0 ]; then
+              echo "| $file | ✅ Success |" >> $GITHUB_STEP_SUMMARY
+            else
+              FAILED=1
+              echo "| $file | ❌ Failed |" >> $GITHUB_STEP_SUMMARY
+      
+              # Print Error Details header only once
+              if [ $FIRST_ERROR -eq 1 ]; then
+                echo "" >> $GITHUB_STEP_SUMMARY
+                echo "## 🔍 Error Details" >> $GITHUB_STEP_SUMMARY
+                FIRST_ERROR=0
+              fi
+      
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "### ❌ $file" >> $GITHUB_STEP_SUMMARY
+              echo '```text' >> $GITHUB_STEP_SUMMARY
+              echo "$OUTPUT" >> $GITHUB_STEP_SUMMARY
+              echo '```' >> $GITHUB_STEP_SUMMARY
+            fi
+      
+            docker exec migration-db rm -f /tmp/"$BASENAME"
+          done
+      
+          if [ $FAILED -ne 0 ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "❌ **One or more migration scripts failed**" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          else
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "✅ **All migration scripts executed successfully**" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      # 7️⃣ Run DB seeds (proper error reporting)
+      - name: Run DB seeds (proper error reporting)
+        if: steps.dbscripts.outputs.found == 'true'
+        run: |
+          set +e
+      
+          SEED_FILES=()
+      
+          # Check if single file exists
+          if [ -f "db/seeds.sql" ]; then
+            SEED_FILES+=("db/seeds.sql")
+          fi
+      
+          # Check if multiple files exist in db/seeds/
+          if compgen -G "db/seeds/*.sql" > /dev/null; then
+            for f in db/seeds/*.sql; do
+              SEED_FILES+=("$f")
+            done
+          fi
+      
+          # Exit if no seed files found
+          if [ ${#SEED_FILES[@]} -eq 0 ]; then
+            echo "No seed files found. Skipping seeds step."
+            exit 0
+          fi
+      
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 🌱 Database Seeds" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Script | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|--------|" >> $GITHUB_STEP_SUMMARY
+      
+          FAILED=0
+          FIRST_ERROR=1
+      
+          for file in "${SEED_FILES[@]}"; do
+            echo "▶ Running $file"
+            BASENAME=$(basename "$file")
+      
+            # Copy seed file into container
+            docker cp "$file" migration-db:/tmp/"$BASENAME"
+      
+            OUTPUT=$(docker exec migration-db \
+              psql -U testuser -d testdb \
+              -v ON_ERROR_STOP=1 \
+              -v VERBOSITY=verbose \
+              -f /tmp/"$BASENAME" 2>&1)
+      
+            if [ $? -eq 0 ]; then
+              echo "| $file | ✅ Success |" >> $GITHUB_STEP_SUMMARY
+            else
+              FAILED=1
+              echo "| $file | ❌ Failed |" >> $GITHUB_STEP_SUMMARY
+      
+              if [ $FIRST_ERROR -eq 1 ]; then
+                echo "" >> $GITHUB_STEP_SUMMARY
+                echo "## 🔍 Seed Error Details" >> $GITHUB_STEP_SUMMARY
+                FIRST_ERROR=0
+              fi
+      
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "### ❌ $file" >> $GITHUB_STEP_SUMMARY
+              echo '```text' >> $GITHUB_STEP_SUMMARY
+              echo "$OUTPUT" >> $GITHUB_STEP_SUMMARY
+              echo '```' >> $GITHUB_STEP_SUMMARY
+            fi
+      
+            docker exec migration-db rm -f /tmp/"$BASENAME"
+          done
+      
+          if [ $FAILED -ne 0 ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "❌ **One or more seed scripts failed**" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          else
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "✅ **All seed scripts applied successfully**" >> $GITHUB_STEP_SUMMARY
+          fi
+
+
+
+      # 8️⃣ Cleanup
+      - name: Stop and remove PostgreSQL container
+        if: steps.dbscripts.outputs.found == 'true'
+        run: |
+          docker stop migration-db
+          docker rm migration-db
