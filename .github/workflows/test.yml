@@ -50,24 +50,80 @@ jobs:
           done
 
       # 6️⃣ Run migrations
-      - name: Run DB migrations
+      - name: Run DB migrations (with summary)
         if: steps.dbscripts.outputs.found == 'true'
         run: |
-          set -e
-          echo "Running migration scripts..."
-          for file in $(ls db/migrations/*.sql | sort); do
-            echo "▶ $file"
-            docker exec -i migration-db \
-              psql -U testuser -d testdb -v ON_ERROR_STOP=1 < "$file"
+          set +e
+
+          echo "## 🗄️ Database Migrations" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Script | Status | Error |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|--------|-------|" >> $GITHUB_STEP_SUMMARY
+
+          FAILED=0
+
+          for file in $(ls db/migrations/*.sql 2>/dev/null | sort); do
+            echo "▶ Running $file"
+
+            OUTPUT=$(docker exec -i migration-db \
+              psql -U testuser -d testdb -v ON_ERROR_STOP=1 < "$file" 2>&1)
+
+            if [ $? -eq 0 ]; then
+              echo "| $file | ✅ Success | - |" >> $GITHUB_STEP_SUMMARY
+            else
+              FAILED=1
+              ERROR=$(echo "$OUTPUT" | tail -n 8 | sed 's/|/\\|/g')
+              echo "| $file | ❌ Failed | \`\`\`$ERROR\`\`\` |" >> $GITHUB_STEP_SUMMARY
+            fi
           done
 
-      # 7️⃣ Run seeds (optional)
-      - name: Run DB seeds
-        if: steps.dbscripts.outputs.found == 'true' && hashFiles('db/seeds.sql') != ''
+          if [ $FAILED -ne 0 ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "❌ **One or more migration scripts failed**" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          else
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "✅ **All migration scripts applied successfully**" >> $GITHUB_STEP_SUMMARY
+          fi
+
+
+            # 7️⃣ Run DB seeds with summary
+      - name: Run DB seeds (with summary)
+        if: steps.dbscripts.outputs.found == 'true' && hashFiles('db/seeds/*.sql') != ''
         run: |
-          echo "Running seeds.sql"
-          docker exec -i migration-db \
-            psql -U testuser -d testdb -v ON_ERROR_STOP=1 < db/seeds.sql
+          set +e
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 🌱 Database Seeds" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Script | Status | Error |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|--------|-------|" >> $GITHUB_STEP_SUMMARY
+
+          FAILED=0
+
+          for file in $(ls db/seeds/*.sql 2>/dev/null | sort); do
+            echo "▶ Running $file"
+
+            OUTPUT=$(docker exec -i migration-db \
+              psql -U testuser -d testdb -v ON_ERROR_STOP=1 < "$file" 2>&1)
+
+            if [ $? -eq 0 ]; then
+              echo "| $file | ✅ Success | - |" >> $GITHUB_STEP_SUMMARY
+            else
+              FAILED=1
+              ERROR=$(echo "$OUTPUT" | tail -n 8 | sed 's/|/\\|/g')
+              echo "| $file | ❌ Failed | \`\`\`$ERROR\`\`\` |" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+
+          if [ $FAILED -ne 0 ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "❌ **One or more seed scripts failed**" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          else
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "✅ **All seed scripts applied successfully**" >> $GITHUB_STEP_SUMMARY
+          fi
 
       # 8️⃣ Cleanup
       - name: Stop and remove PostgreSQL container
