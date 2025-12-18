@@ -50,40 +50,52 @@ jobs:
           done
 
       # 6️⃣ Run migrations
-      - name: Run DB migrations
+      - name: Run DB migrations with detailed errors
         if: steps.dbscripts.outputs.found == 'true'
         run: |
           set -e
           echo "Running migration scripts..."
+      
           SUCCESS=()
           FAIL=()
       
           for file in $(ls db/migrations/*.sql | sort); do
             echo "▶ Running $file"
-            if docker exec -i migration-db psql -U testuser -d testdb -v ON_ERROR_STOP=1 < "$file"; then
+            ERROR=$(docker exec -i migration-db psql -U testuser -d testdb -v ON_ERROR_STOP=1 < "$file" 2>&1) || true
+            if [ $? -eq 0 ]; then
               echo "✅ Success: $file"
               SUCCESS+=("$file")
             else
               echo "❌ Failed: $file"
+              echo "$ERROR" | while IFS= read -r line; do
+                # Show lines with "LINE <n>:" from psql errors
+                if [[ $line =~ LINE\ [0-9]+: ]]; then
+                  echo "   $line"
+                fi
+              done
               FAIL+=("$file")
             fi
-            echo "--------------------------------------------------"
           done
       
+          echo "--------------------------------------------------"
           echo "✅ Successful migrations:"
-          for f in "${SUCCESS[@]}"; do
-            echo "- $f"
-          done
+          if [ ${#SUCCESS[@]} -eq 0 ]; then
+            echo "None"
+          else
+            for s in "${SUCCESS[@]}"; do echo "- $s"; done
+          fi
       
           echo "❌ Failed migrations:"
           if [ ${#FAIL[@]} -eq 0 ]; then
             echo "None"
           else
-            for f in "${FAIL[@]}"; do
-              echo "- $f"
-            done
+            for f in "${FAIL[@]}"; do echo "- $f"; done
           fi
-
+      
+          # Fail the step if there is any failure
+          if [ ${#FAIL[@]} -ne 0 ]; then
+            exit 1
+          fi
 
       # 7️⃣ Run seeds (optional)
       - name: Run DB seeds
