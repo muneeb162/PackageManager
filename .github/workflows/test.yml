@@ -49,7 +49,7 @@ jobs:
             sleep 3
           done
 
-      - name: Run DB migrations (with correct error reporting)
+      - name: Run DB migrations (proper error reporting)
         if: steps.dbscripts.outputs.found == 'true'
         run: |
           set +e
@@ -65,10 +65,16 @@ jobs:
           for file in $(ls db/migrations/*.sql 2>/dev/null | sort); do
             echo "▶ Running $file"
       
-            OUTPUT=$(docker exec -i migration-db \
+            BASENAME=$(basename "$file")
+      
+            # Copy SQL file into container
+            docker cp "$file" migration-db:/tmp/"$BASENAME"
+      
+            OUTPUT=$(docker exec migration-db \
               psql -U testuser -d testdb \
               -v ON_ERROR_STOP=1 \
-              -v VERBOSITY=verbose < "$file" 2>&1)
+              -v VERBOSITY=verbose \
+              -f /tmp/"$BASENAME" 2>&1)
       
             if [ $? -eq 0 ]; then
               echo "| $file | ✅ Success |" >> $GITHUB_STEP_SUMMARY
@@ -83,6 +89,9 @@ jobs:
               \`\`\`
               "
             fi
+      
+            # Cleanup copied file
+            docker exec migration-db rm -f /tmp/"$BASENAME"
           done
       
           if [ $FAILED -ne 0 ]; then
@@ -94,6 +103,7 @@ jobs:
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "✅ **All migration scripts executed successfully**" >> $GITHUB_STEP_SUMMARY
           fi
+
 
 
 
