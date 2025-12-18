@@ -38,7 +38,7 @@ jobs:
             -e POSTGRES_PASSWORD=testpass \
             -e POSTGRES_DB=testdb \
             -p 5432:5432 \
-            postgres:17
+            postgres:15
 
       # 5️⃣ Wait for DB readiness
       - name: Wait for DB readiness
@@ -50,102 +50,24 @@ jobs:
           done
 
       # 6️⃣ Run migrations
-      - name: Run DB migrations with detailed errors
+      - name: Run DB migrations
         if: steps.dbscripts.outputs.found == 'true'
         run: |
           set -e
           echo "Running migration scripts..."
-      
-          mkdir -p /tmp/db-validation
-          : > /tmp/db-validation/success.txt
-          : > /tmp/db-validation/fail.txt
-          : > /tmp/db-validation/errors.txt
-      
           for file in $(ls db/migrations/*.sql | sort); do
-            echo "▶ Running $file"
-            ERROR=$(docker exec -i migration-db \
-              psql -U testuser -d testdb -v ON_ERROR_STOP=1 < "$file" 2>&1) || true
-      
-            if [ $? -eq 0 ]; then
-              echo "✅ Success: $file"
-              echo "$file" >> /tmp/db-validation/success.txt
-            else
-              echo "❌ Failed: $file"
-              echo "$file" >> /tmp/db-validation/fail.txt
-              {
-                echo "### $file"
-                echo "$ERROR"
-              } >> /tmp/db-validation/errors.txt
-            fi
+            echo "▶ $file"
+            docker exec -i migration-db \
+              psql -U testuser -d testdb -v ON_ERROR_STOP=1 < "$file"
           done
-      
-          # Fail pipeline if any migration failed
-          if [ -s /tmp/db-validation/fail.txt ]; then
-            exit 1
-          fi
 
+      # 7️⃣ Run seeds (optional)
       - name: Run DB seeds
         if: steps.dbscripts.outputs.found == 'true' && hashFiles('db/seeds.sql') != ''
         run: |
           echo "Running seeds.sql"
-          if docker exec -i migration-db \
-            psql -U testuser -d testdb -v ON_ERROR_STOP=1 < db/seeds.sql 2>/tmp/db-validation/seeds_error.txt; then
-            echo "PASS" > /tmp/db-validation/seeds_status.txt
-          else
-            echo "FAIL" > /tmp/db-validation/seeds_status.txt
-          fi
-
-      - name: DB Migration Validation Summary
-        run: |
-          VALIDATION_TIME=$(date -u +'%Y-%m-%d %H:%M:%S UTC')
-      
-          echo "## 🛠️ Database Migration Validation Report" >> $GITHUB_STEP_SUMMARY
-          echo "**Validation Time:** $VALIDATION_TIME" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-      
-          echo "### Migration Files Validation" >> $GITHUB_STEP_SUMMARY
-          echo "| File | Type | Status | Notes |" >> $GITHUB_STEP_SUMMARY
-          echo "|------|------|--------|-------|" >> $GITHUB_STEP_SUMMARY
-      
-          # Successful migrations
-          if [ -f /tmp/db-validation/success.txt ]; then
-            while read -r file; do
-              echo "| $(basename "$file") | migration | PASS | None |" >> $GITHUB_STEP_SUMMARY
-            done < /tmp/db-validation/success.txt
-          fi
-      
-          # Failed migrations
-          if [ -f /tmp/db-validation/fail.txt ]; then
-            while read -r file; do
-              ERROR=$(grep -A5 "$file" /tmp/db-validation/errors.txt | tr '\n' ' ')
-              echo "| $(basename "$file") | migration | FAIL | $ERROR |" >> $GITHUB_STEP_SUMMARY
-            done < /tmp/db-validation/fail.txt
-          fi
-      
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Seed File Validation" >> $GITHUB_STEP_SUMMARY
-          echo "| File | Type | Status | Notes |" >> $GITHUB_STEP_SUMMARY
-          echo "|------|------|--------|-------|" >> $GITHUB_STEP_SUMMARY
-      
-          if [ -f /tmp/db-validation/seeds_status.txt ]; then
-            STATUS=$(cat /tmp/db-validation/seeds_status.txt)
-            if [ "$STATUS" = "PASS" ]; then
-              echo "| seeds.sql | seed | PASS | None |" >> $GITHUB_STEP_SUMMARY
-            else
-              NOTES=$(cat /tmp/db-validation/seeds_error.txt | tr '\n' ' ')
-              echo "| seeds.sql | seed | FAIL | $NOTES |" >> $GITHUB_STEP_SUMMARY
-            fi
-          else
-            echo "| seeds.sql | seed | SKIPPED | File not found |" >> $GITHUB_STEP_SUMMARY
-          fi
-      
-          echo "" >> $GITHUB_STEP_SUMMARY
-          if [ -s /tmp/db-validation/fail.txt ] || [ "$(cat /tmp/db-validation/seeds_status.txt 2>/dev/null)" = "FAIL" ]; then
-            echo "⚠️ Some migration/seed files failed validation." >> $GITHUB_STEP_SUMMARY
-          else
-            echo "✅ All migration and seed files validated successfully." >> $GITHUB_STEP_SUMMARY
-          fi
-
+          docker exec -i migration-db \
+            psql -U testuser -d testdb -v ON_ERROR_STOP=1 < db/seeds.sql
 
       # 8️⃣ Cleanup
       - name: Stop and remove PostgreSQL container
@@ -153,4 +75,3 @@ jobs:
         run: |
           docker stop migration-db
           docker rm migration-db
-
