@@ -109,9 +109,29 @@ jobs:
 
       # 7️⃣ Run DB seeds (proper error reporting)
       - name: Run DB seeds (proper error reporting)
-        if: steps.dbscripts.outputs.found == 'true' && hashFiles('db/seeds/*.sql') != ''
+        if: steps.dbscripts.outputs.found == 'true'
         run: |
           set +e
+      
+          SEED_FILES=()
+      
+          # Check if single file exists
+          if [ -f "db/seeds.sql" ]; then
+            SEED_FILES+=("db/seeds.sql")
+          fi
+      
+          # Check if multiple files exist in db/seeds/
+          if compgen -G "db/seeds/*.sql" > /dev/null; then
+            for f in db/seeds/*.sql; do
+              SEED_FILES+=("$f")
+            done
+          fi
+      
+          # Exit if no seed files found
+          if [ ${#SEED_FILES[@]} -eq 0 ]; then
+            echo "No seed files found. Skipping seeds step."
+            exit 0
+          fi
       
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "## 🌱 Database Seeds" >> $GITHUB_STEP_SUMMARY
@@ -122,7 +142,7 @@ jobs:
           FAILED=0
           FIRST_ERROR=1
       
-          for file in $(ls db/seeds/*.sql 2>/dev/null | sort); do
+          for file in "${SEED_FILES[@]}"; do
             echo "▶ Running $file"
             BASENAME=$(basename "$file")
       
@@ -141,7 +161,6 @@ jobs:
               FAILED=1
               echo "| $file | ❌ Failed |" >> $GITHUB_STEP_SUMMARY
       
-              # Print Error Details header once
               if [ $FIRST_ERROR -eq 1 ]; then
                 echo "" >> $GITHUB_STEP_SUMMARY
                 echo "## 🔍 Seed Error Details" >> $GITHUB_STEP_SUMMARY
@@ -155,7 +174,6 @@ jobs:
               echo '```' >> $GITHUB_STEP_SUMMARY
             fi
       
-            # Cleanup copied file
             docker exec migration-db rm -f /tmp/"$BASENAME"
           done
       
@@ -167,6 +185,7 @@ jobs:
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "✅ **All seed scripts applied successfully**" >> $GITHUB_STEP_SUMMARY
           fi
+
 
 
       # 8️⃣ Cleanup
