@@ -105,13 +105,6 @@ jobs:
           docker exec -i migration-db \
             psql -U testuser -d testdb -v ON_ERROR_STOP=1 < db/seeds.sql
 
-      # 8️⃣ Cleanup
-      - name: Stop and remove PostgreSQL container
-        if: steps.dbscripts.outputs.found == 'true'
-        run: |
-          docker stop migration-db
-          docker rm migration-db
-
       - name: DB Migration Validation Summary
         id: db_migration
         run: |
@@ -165,4 +158,11 @@ jobs:
           else
             echo "migration_failed=false" >> $GITHUB_OUTPUT
           fi
+
+      # 8️⃣ Cleanup
+      - name: Stop and remove PostgreSQL container
+        if: steps.dbscripts.outputs.found == 'true'
+        run: |
+          docker stop migration-db
+          docker rm migration-db
 
